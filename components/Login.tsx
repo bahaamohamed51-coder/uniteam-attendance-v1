@@ -46,6 +46,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       return;
     }
     
+    // التحقق من قوة كلمة المرور (6 أرقام على الأقل وليست أصفار فقط)
+    if (password.length < 6) {
+      setError('كلمة المرور يجب ألا تقل عن 6 أرقام/حروف');
+      return;
+    }
+    if (/^0+$/.test(password)) {
+      setError('لا يمكن أن تتكون كلمة المرور من أصفار فقط');
+      return;
+    }
+    
     const deviceId = getDeviceFingerprint();
 
     const existingById = allUsers.find(u => u.nationalId === nationalId);
@@ -94,7 +104,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
   const handleEmployeeLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // البحث عن المستخدم مع التأكد من مطابقة كلمة المرور المحفوظة في السحابة
+    
+    // التحقق مما إذا كانت البيانات قد جُلبت من السحابة بعد (لحماية الدخول فور فتح التطبيق)
+    if (allUsers.length === 0 && adminConfig.syncUrl) {
+       setError('جاري جلب بيانات الموظفين من السحابة، يرجى الانتظار ثانية واحدة...');
+       return;
+    }
+
     const user = allUsers.find(u => u.nationalId === nationalId && u.password === password);
     
     if (user) {
@@ -184,7 +200,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
                 <span className="text-[9px] text-blue-300 font-bold">سيتم ربط حسابك بهذا الهاتف تلقائياً ولن يعمل على غيره</span>
               </div>
               <input type="text" placeholder="الاسم الرباعي" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClasses} />
-              <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value)} className={inputClasses} />
+              <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} className={inputClasses} />
               <div className="relative">
                 <select 
                   value={selectedJob} 
@@ -196,7 +212,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
                 </select>
                 <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
-              <input type="password" placeholder="تعيين كلمة مرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
+              <input type="password" placeholder="تعيين كلمة مرور (6 أرقام على الأقل)" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
                 {isLoading ? 'جاري التحقق...' : 'تسجيل وربط الجهاز'}
