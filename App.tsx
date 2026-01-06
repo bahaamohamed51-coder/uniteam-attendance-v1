@@ -24,7 +24,7 @@ const App: React.FC = () => {
     };
   });
 
-  const syncWithCloud = useCallback(async (url: string) => {
+  const syncWithCloud = useCallback(async (url: string, force: boolean = false) => {
     if (!url || !url.startsWith('http')) return;
     setIsSyncing(true);
     setSyncError(false);
@@ -34,8 +34,12 @@ const App: React.FC = () => {
       if (!response.ok) throw new Error('فشل الاتصال');
       const data = await response.json();
       
+      // تحديث الفروع والوظائف فقط إذا كان الموظف أو إذا طلب المسؤول ذلك يدوياً
       if (data.branches) setBranches(data.branches);
       if (data.jobs) setJobs(data.jobs);
+      
+      // تحديث قائمة الموظفين إذا كانت موجودة في الاستجابة (اختياري حسب منطق الـ backend)
+      if (data.users && Array.isArray(data.users)) setAllUsers(data.users);
       
       const updatedConfig = { 
         ...config, 
@@ -67,7 +71,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // إيقاف المزامنة التلقائية إذا كان المستخدم مسؤولاً
+    // إيقاف المزامنة التلقائية للمسؤول لحماية بياناته المحلية من الدهس
     if (currentUser?.role === 'admin') return;
 
     const params = new URLSearchParams(window.location.search);
@@ -105,7 +109,7 @@ const App: React.FC = () => {
   };
 
   const handleRefresh = () => {
-    if (config.syncUrl) syncWithCloud(config.syncUrl);
+    if (config.syncUrl) syncWithCloud(config.syncUrl, true);
   };
 
   return (
@@ -148,6 +152,8 @@ const App: React.FC = () => {
               jobs={jobs} setJobs={setJobs}
               records={records} config={config} setConfig={setConfig}
               allUsers={allUsers} setAllUsers={setAllUsers}
+              onRefresh={handleRefresh}
+              isSyncing={isSyncing}
             />
           ) : (
             <UserDashboard 
