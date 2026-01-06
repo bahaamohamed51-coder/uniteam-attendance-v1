@@ -92,18 +92,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
       
-      // منطق ربط الجهاز المتقدم
+      // Strict Device Binding Logic
       if (user.deviceId) {
-        // إذا كان الحساب مربوطاً بجهاز، يجب أن يتطابق مع الجهاز الحالي
+        // If account is linked to a device, it must match current device
         if (user.deviceId !== currentDeviceId) {
-          setError('عذراً، هذا الحساب مربوط بجهاز آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة. يرجى مراجعة المسؤول لفك الارتباط إذا كان هذا هاتفك الجديد.');
+          setError('عذراً، هذا الحساب مربوط بهاتف آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة. يرجى مراجعة المسؤول لفك الارتباط إذا كان هذا هاتفك الجديد.');
           return;
         }
       } else {
-        // إذا كان الـ deviceId فارغاً (بسبب إضافة المسؤول أو إعادة التعيين)
-        // يتم ربط الجهاز الحالي فوراً بالحساب
+        // If deviceId is empty (e.g., admin reset it), bind the current device automatically
         user.deviceId = currentDeviceId;
-        // سيتم حفظ التغيير في App.tsx عبر localStorage عند استدعاء onLogin
+        // The update will persist because handleLogin updates states and App.tsx saves to localStorage
       }
       
       onLogin(user);
