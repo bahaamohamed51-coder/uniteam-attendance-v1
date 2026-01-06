@@ -27,7 +27,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
     if (!syncUrlInput.startsWith('http')) {
-      setError('يرجى إدخال رابط صحيح يبدأ بـ https://');
+      setError('يرجى إدخل رابط صحيح يبدأ بـ https://');
       return;
     }
     setAdminConfig({ syncUrl: syncUrlInput, googleSheetLink: syncUrlInput });
@@ -46,7 +46,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       return;
     }
     
-    // منع تسجيل الموظف أكثر من مرة بنفس الرقم القومي
     const existing = allUsers.find(u => u.nationalId === nationalId);
     if (existing) {
       setError('هذا الرقم القومي مسجل مسبقاً، يرجى تسجيل الدخول مباشرة');
@@ -54,7 +53,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     }
 
     setIsLoading(true);
-    // ربط الحساب ببصمة الجهاز الحالية
     const deviceId = getDeviceFingerprint();
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -92,12 +90,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     const user = allUsers.find(u => u.nationalId === nationalId && u.password === password);
     
     if (user) {
-      // التحقق من ربط الجهاز
       const currentDeviceId = getDeviceFingerprint();
-      if (user.deviceId && user.deviceId !== currentDeviceId) {
-        setError('عذراً، هذا الحساب مربوط بجهاز آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة.');
-        return;
+      
+      // منطق ربط الجهاز المتقدم
+      if (user.deviceId) {
+        // إذا كان الحساب مربوطاً بجهاز، يجب أن يتطابق مع الجهاز الحالي
+        if (user.deviceId !== currentDeviceId) {
+          setError('عذراً، هذا الحساب مربوط بجهاز آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة. يرجى مراجعة المسؤول لفك الارتباط إذا كان هذا هاتفك الجديد.');
+          return;
+        }
+      } else {
+        // إذا كان الـ deviceId فارغاً (بسبب إضافة المسؤول أو إعادة التعيين)
+        // يتم ربط الجهاز الحالي فوراً بالحساب
+        user.deviceId = currentDeviceId;
+        // سيتم حفظ التغيير في App.tsx عبر localStorage عند استدعاء onLogin
       }
+      
       onLogin(user);
     } else {
       setError('بيانات الدخول غير صحيحة، تأكد من الرقم القومي وكلمة المرور');
