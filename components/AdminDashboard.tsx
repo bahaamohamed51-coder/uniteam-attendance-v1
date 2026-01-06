@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Branch, AttendanceRecord, AppConfig, User, Job } from '../types';
-import { MapPin, Table, Trash2, Edit3, Shield, CloudUpload, Briefcase, RotateCcw, Info, Globe, Users, Plus, FileSpreadsheet, Download, Share2, AlertTriangle } from 'lucide-react';
+import { MapPin, Table, Trash2, Shield, CloudUpload, Briefcase, RotateCcw, Globe, Users, Plus, FileSpreadsheet, Download, Share2, AlertTriangle, Smartphone, RefreshCw } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface AdminDashboardProps {
@@ -38,7 +38,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     setIsPushing(true);
     try {
-      // إرسال البيانات للسحابة (Google Sheets)
       await fetch(config.syncUrl, {
         method: 'POST',
         mode: 'no-cors',
@@ -46,14 +45,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         body: JSON.stringify({
           action: 'updateSystem',
           branches: branches,
-          jobs: jobs
+          jobs: jobs,
+          users: allUsers // إضافة الموظفين للمزامنة لضمان حفظ حالة الأجهزة
         })
       });
-      alert("تم إرسال الفروع والوظائف للسحابة! الآن يمكن للموظفين رؤية التحديثات عند فتح التطبيق.");
+      alert("تم إرسال البيانات للسحابة بنجاح!");
     } catch (err) {
       alert("حدث خطأ أثناء الاتصال بالسحابة");
     } finally {
       setIsPushing(false);
+    }
+  };
+
+  const resetDevice = (userId: string) => {
+    if (confirm("هل أنت متأكد من حذف ارتباط الجهاز؟ سيتمكن الموظف من التسجيل من هاتف جديد عند أول دخول.")) {
+      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, deviceId: undefined } : u));
     }
   };
 
@@ -67,7 +73,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     const inviteLink = `${baseUrl}?c=${encodedUrl}`;
     
     navigator.clipboard.writeText(inviteLink).then(() => {
-      alert("تم نسخ رابط الربط! أرسله للموظفين في واتساب. عند فتحه سيظهر لهم كل ما قمت بتعديله.");
+      alert("تم نسخ رابط الربط!");
     });
   };
 
@@ -99,7 +105,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         }));
         setJobs(prev => [...prev, ...importedJobs]);
       }
-      alert("تم الاستيراد محلياً. هام جداً: اضغط على زر 'مزامنة للسحابة' باللون البرتقالي لتظهر البيانات للموظفين.");
+      alert("تم الاستيراد محلياً. لا تنسى الضغط على 'مزامنة للسحابة'.");
       if(e.target) e.target.value = '';
     };
     reader.readAsBinaryString(file);
@@ -132,7 +138,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => handleExcelImport(e, 'branches')} />
       <input type="file" ref={jobFileInputRef} className="hidden" accept=".xlsx, .xls, .csv" onChange={(e) => handleExcelImport(e, 'jobs')} />
 
-      {/* Header with Sync Notice */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
         <div className="text-white">
           <h2 className="text-2xl font-black italic uppercase tracking-tighter text-blue-400">Uniteam Admin</h2>
@@ -152,13 +157,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
            </button>
         </div>
       </div>
-
-      {!config.syncUrl && (
-        <div className="bg-red-900/20 border border-red-800 p-4 rounded-2xl flex items-center gap-3 text-red-400 text-xs font-black animate-pulse">
-           <AlertTriangle size={20} />
-           يرجى ضبط رابط المزامنة في تبويب 'الإعدادات' لتتمكن من إرسال البيانات للموظفين.
-        </div>
-      )}
 
       <nav className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {[
@@ -185,9 +183,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {activeTab === 'branches' && (
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-               <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">
-                  الفروع والمسافات
-               </h4>
+               <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">الفروع والمسافات</h4>
                <div className="flex gap-2">
                  <button onClick={() => downloadTemplate('branches')} className="flex items-center gap-2 bg-slate-700 text-slate-300 px-3 py-1.5 rounded-xl text-[10px] font-black border border-slate-600"><Download size={14} /> نموذج Excel</button>
                  <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 bg-green-600/20 text-green-400 px-3 py-1.5 rounded-xl text-[10px] font-black border border-green-900/50"><FileSpreadsheet size={14} /> استيراد Excel</button>
@@ -257,6 +253,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         )}
 
+        {activeTab === 'users' && (
+           <div className="space-y-6">
+             <div className="flex justify-between items-center">
+               <h3 className="text-lg font-black text-blue-400 uppercase tracking-tighter">الموظفين المسجلين</h3>
+               <span className="bg-slate-900 px-4 py-1.5 rounded-full text-[10px] font-black border border-slate-700">{allUsers.length} موظف</span>
+             </div>
+             <div className="overflow-x-auto">
+               <table className="w-full text-right min-w-[600px]">
+                 <thead><tr className="border-b border-slate-700 text-xs font-black text-slate-500"><th className="py-4 px-2">الاسم</th><th className="py-4 px-2 text-center">الرقم القومي</th><th className="py-4 px-2">الوظيفة</th><th className="py-4 px-2 text-center">الجهاز</th><th className="py-4 px-2 text-center">إجراءات</th></tr></thead>
+                 <tbody>{allUsers.map(user => (
+                   <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-900/30">
+                     <td className="py-4 px-2 font-bold">{user.fullName}</td>
+                     <td className="py-4 px-2 text-slate-400 text-sm text-center font-mono">{user.nationalId}</td>
+                     <td className="py-4 px-2 font-black text-blue-400 text-xs">{user.jobTitle || '---'}</td>
+                     <td className="py-4 px-2 text-center">
+                        <div className="flex flex-col items-center">
+                           <span className={`text-[9px] font-black uppercase ${user.deviceId ? 'text-green-400' : 'text-slate-500'}`}>
+                             {user.deviceId ? 'مربوط' : 'غير مربوط'}
+                           </span>
+                           {user.deviceId && (
+                             <button onClick={() => resetDevice(user.id)} className="flex items-center gap-1 mt-1 px-2 py-1 bg-orange-900/30 text-orange-400 border border-orange-800 rounded-md text-[8px] font-black hover:bg-orange-800 hover:text-white transition-all">
+                               <RefreshCw size={10} /> إعادة تعيين الجهاز
+                             </button>
+                           )}
+                        </div>
+                     </td>
+                     <td className="py-4 px-2 text-center flex justify-center gap-2">
+                       <button onClick={() => setAllUsers(allUsers.filter(u => u.id !== user.id))} className="text-red-500 p-2 hover:bg-red-900/20 rounded-lg"><Trash2 size={16}/></button>
+                     </td>
+                   </tr>
+                 ))}</tbody>
+               </table>
+             </div>
+           </div>
+        )}
+
         {activeTab === 'settings' && (
            <div className="space-y-10 max-w-2xl mx-auto py-4">
               <div className="space-y-4">
@@ -265,11 +297,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">رابط الـ Web App (Apps Script)</label>
                     <input type="text" className={inputClasses} value={syncUrl} onChange={e => setSyncUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" />
-                  </div>
-                  <div className="p-4 bg-blue-900/20 border border-blue-800/50 rounded-2xl">
-                    <p className="text-[10px] text-blue-300 font-bold leading-relaxed mb-4">
-                      بعد وضع الرابط وحفظ الإعدادات، استخدم زر 'مشاركة رابط الربط' في الأعلى لمشاركة التطبيق مع الموظفين لضمان مزامنتهم معك.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -290,22 +317,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <button onClick={handleSaveSettings} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-5 rounded-2xl shadow-xl transition-all">حفظ الإعدادات بالكامل</button>
            </div>
         )}
-
-        {/* Other tabs remain similar but stylized */}
-        {activeTab === 'users' && (
-           <div className="space-y-6">
-             <div className="flex justify-between items-center"><h3 className="text-lg font-black text-blue-400 uppercase tracking-tighter">الموظفين المسجلين</h3><span className="bg-slate-900 px-4 py-1.5 rounded-full text-[10px] font-black border border-slate-700">{allUsers.length} موظف</span></div>
-             <table className="w-full text-right min-w-[500px]">
-               <thead><tr className="border-b border-slate-700 text-xs font-black text-slate-500"><th className="py-4 px-2">الاسم</th><th className="py-4 px-2 text-center">الرقم القومي</th><th className="py-4 px-2">الوظيفة</th><th className="py-4 px-2 text-center">إجراءات</th></tr></thead>
-               <tbody>{allUsers.map(user => (
-                 <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-900/30">
-                   <td className="py-4 px-2 font-bold">{user.fullName}</td><td className="py-4 px-2 text-slate-400 text-sm text-center font-mono">{user.nationalId}</td><td className="py-4 px-2 font-black text-blue-400 text-xs">{user.jobTitle || '---'}</td>
-                   <td className="py-4 px-2 text-center flex justify-center gap-2"><button onClick={() => setAllUsers(allUsers.filter(u => u.id !== user.id))} className="text-red-500 p-2 hover:bg-red-900/20 rounded-lg"><Trash2 size={16}/></button></td>
-                 </tr>
-               ))}</tbody>
-             </table>
-           </div>
-        )}
+        
         {activeTab === 'reports' && <div className="flex flex-col items-center justify-center py-24 text-slate-500 space-y-4"><Table size={48} className="opacity-20 text-blue-400" /><div className="text-center"><p className="font-black text-lg text-slate-300">التقارير السحابية</p><p className="text-[10px] font-bold mt-1 uppercase tracking-widest">يتم التسجيل لحظياً في ملف جوجل شيت المربوط</p></div></div>}
       </div>
     </div>
