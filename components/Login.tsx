@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, AppConfig, Job } from '../types';
-import { UserPlus, LogIn, ShieldAlert, Key, Smartphone, Briefcase, Loader2 } from 'lucide-react';
+import { UserPlus, LogIn, ShieldAlert, Key, Smartphone, Briefcase, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import { getDeviceFingerprint } from '../utils';
 
 interface LoginProps {
@@ -9,18 +9,31 @@ interface LoginProps {
   allUsers: User[];
   adminConfig: AppConfig;
   availableJobs: Job[];
+  setAdminConfig: (cfg: Partial<AppConfig>) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs }) => {
-  const [mode, setMode] = useState<'register' | 'login' | 'admin'>('register');
+const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs, setAdminConfig }) => {
+  const [mode, setMode] = useState<'register' | 'login' | 'admin' | 'connect'>(adminConfig.syncUrl ? 'register' : 'connect');
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [password, setPassword] = useState('');
   const [selectedJob, setSelectedJob] = useState('');
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [syncUrlInput, setSyncUrlInput] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleConnect = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!syncUrlInput.startsWith('http')) {
+      setError('يرجى إدخال رابط صحيح يبدأ بـ https://');
+      return;
+    }
+    setAdminConfig({ syncUrl: syncUrlInput, googleSheetLink: syncUrlInput });
+    setMode('register');
+    setError('');
+  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +64,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       jobTitle: selectedJob
     };
 
-    // رفع البيانات الشخصية للسحابة فوراً لضمان عدم التلاعب
     if (adminConfig.googleSheetLink) {
       try {
         await fetch(adminConfig.googleSheetLink, {
@@ -101,27 +113,50 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
   const inputClasses = "w-full px-4 py-3.5 rounded-2xl border border-slate-600 bg-slate-900 text-white placeholder:text-slate-500 font-bold outline-none focus:border-blue-500 transition-all shadow-inner";
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-gray-50">
+    <div className="min-h-full flex items-center justify-center p-0">
       <div className="bg-slate-800 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-700">
         <div className="bg-blue-600 p-8 text-white text-center">
           <h2 className="text-4xl font-black mb-1 italic tracking-tighter uppercase">Uniteam</h2>
-          <p className="text-blue-100 text-[10px] font-bold tracking-widest uppercase">System Registration</p>
+          <p className="text-blue-100 text-[10px] font-bold tracking-widest uppercase">
+            {mode === 'connect' ? 'Company Connection' : 'System Access'}
+          </p>
         </div>
 
         <div className="p-8">
-          <div className="flex bg-slate-900/50 p-1 rounded-2xl mb-8 border border-slate-700">
-            {['register', 'login', 'admin'].map((m) => (
-              <button
-                key={m}
-                onClick={() => { setMode(m as any); setError(''); }}
-                className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all ${mode === m ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-              >
-                {m === 'register' ? 'تسجيل موظف' : m === 'login' ? 'دخول' : 'إدارة'}
-              </button>
-            ))}
-          </div>
+          {adminConfig.syncUrl ? (
+            <div className="flex bg-slate-900/50 p-1 rounded-2xl mb-8 border border-slate-700">
+              {['register', 'login', 'admin'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => { setMode(m as any); setError(''); }}
+                  className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all ${mode === m ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  {m === 'register' ? 'تسجيل' : m === 'login' ? 'دخول' : 'إدارة'}
+                </button>
+              ))}
+            </div>
+          ) : mode !== 'admin' && (
+            <div className="mb-8 p-4 bg-orange-900/20 border-r-4 border-orange-500 rounded-xl">
+              <p className="text-orange-400 text-xs font-bold leading-relaxed">
+                التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" الذي حصلت عليه من المسؤول لتتمكن من التسجيل.
+              </p>
+            </div>
+          )}
 
           {error && <div className="mb-6 p-4 bg-red-900/20 border-r-4 border-red-500 text-red-400 text-xs font-bold">{error}</div>}
+
+          {mode === 'connect' && (
+            <form onSubmit={handleConnect} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] text-slate-500 font-black mr-2 uppercase">رابط الشركة (Sync URL)</label>
+                <input type="text" placeholder="https://script.google.com/..." value={syncUrlInput} onChange={e => setSyncUrlInput(e.target.value)} className={inputClasses} />
+              </div>
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
+                <LinkIcon size={20} /> ربط التطبيق بالشركة
+              </button>
+              <button type="button" onClick={() => setMode('admin')} className="w-full text-slate-500 text-[10px] font-black py-2">أنا مسؤول النظام</button>
+            </form>
+          )}
 
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
@@ -141,7 +176,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <input type="password" placeholder="تعيين كلمة مرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
-                {isLoading ? 'جاري الحفظ سحابياً...' : 'إنشاء حساب وربط الهاتف'}
+                {isLoading ? 'جاري الربط...' : 'إنشاء حساب وربط الهاتف'}
               </button>
             </form>
           )}
@@ -163,6 +198,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <button type="submit" className="w-full bg-slate-700 hover:bg-slate-600 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all border border-slate-500">
                 <ShieldAlert size={20} /> دخول لوحة التحكم
               </button>
+              {adminConfig.syncUrl ? (
+                 <button type="button" onClick={() => setMode('register')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للتسجيل</button>
+              ) : (
+                 <button type="button" onClick={() => setMode('connect')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للربط</button>
+              )}
             </form>
           )}
         </div>
