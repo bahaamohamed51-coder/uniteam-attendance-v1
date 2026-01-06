@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Branch, AttendanceRecord, AppConfig, Job } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
-import { LogOut, ShieldCheck, User as UserIcon, Cloud } from 'lucide-react';
+import { LogOut, ShieldCheck, User as UserIcon, Cloud, CloudOff, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -13,13 +13,42 @@ const App: React.FC = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState(false);
   const [config, setConfig] = useState<AppConfig>({ 
     googleSheetLink: '',
     syncUrl: '',
     adminUsername: 'admin',
-    adminPassword: 'B522129' // تم التحديث بناءً على الطلب
+    adminPassword: 'B522129'
   });
 
+  // دالة لجلب البيانات من السحابة
+  const syncWithCloud = useCallback(async (url: string) => {
+    if (!url || !url.startsWith('http')) return;
+    setIsSyncing(true);
+    setSyncError(false);
+    try {
+      const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}action=getData`);
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      
+      if (data.branches && Array.isArray(data.branches)) {
+        setBranches(data.branches);
+        localStorage.setItem('attendance_branches', JSON.stringify(data.branches));
+      }
+      if (data.jobs && Array.isArray(data.jobs)) {
+        setJobs(data.jobs);
+        localStorage.setItem('attendance_jobs', JSON.stringify(data.jobs));
+      }
+      setConfig(prev => ({ ...prev, lastUpdated: new Date().toISOString() }));
+    } catch (err) {
+      console.error("Cloud sync failed", err);
+      setSyncError(true);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, []);
+
+  // تحميل البيانات المحلية عند بدء التشغيل
   useEffect(() => {
     const savedUser = localStorage.getItem('attendance_current_user');
     const savedBranches = localStorage.getItem('attendance_branches');
@@ -36,32 +65,36 @@ const App: React.FC = () => {
     
     if (savedConfig) {
       const parsedConfig = JSON.parse(savedConfig);
-      // التأكد من أن كلمة المرور المحدثة هي السائدة حتى لو كان هناك قديم مخزن
-      setConfig({ ...parsedConfig, adminPassword: 'B522129' });
-      if (parsedConfig.syncUrl) syncWithCloud(parsedConfig.syncUrl);
+      const updatedConfig = { ...parsedConfig, adminPassword: 'B522129' };
+      setConfig(updatedConfig);
+      
+      // مزامنة تلقائية إذا كان الرابط موجوداً
+      if (updatedConfig.syncUrl) {
+        syncWithCloud(updatedConfig.syncUrl);
+      }
     }
-  }, []);
+  }, [syncWithCloud]);
 
-  const syncWithCloud = async (url: string) => {
-    if (!url) return;
-    setIsSyncing(true);
-    try {
-      const response = await fetch(`${url}?action=getData`);
-      const data = await response.json();
-      if (data.branches) setBranches(data.branches);
-      if (data.jobs) setJobs(data.jobs);
-    } catch (err) {
-      console.error("Cloud sync failed", err);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  // حفظ البيانات في LocalStorage عند تغيرها
+  useEffect(() => {
+    localStorage.setItem('attendance_branches', JSON.stringify(branches));
+  }, [branches]);
 
-  useEffect(() => localStorage.setItem('attendance_branches', JSON.stringify(branches)), [branches]);
-  useEffect(() => localStorage.setItem('attendance_jobs', JSON.stringify(jobs)), [jobs]);
-  useEffect(() => localStorage.setItem('attendance_records', JSON.stringify(records)), [records]);
-  useEffect(() => localStorage.setItem('attendance_config', JSON.stringify(config)), [config]);
-  useEffect(() => localStorage.setItem('attendance_all_users', JSON.stringify(allUsers)), [allUsers]);
+  useEffect(() => {
+    localStorage.setItem('attendance_jobs', JSON.stringify(jobs));
+  }, [jobs]);
+
+  useEffect(() => {
+    localStorage.setItem('attendance_records', JSON.stringify(records));
+  }, [records]);
+
+  useEffect(() => {
+    localStorage.setItem('attendance_config', JSON.stringify(config));
+  }, [config]);
+
+  useEffect(() => {
+    localStorage.setItem('attendance_all_users', JSON.stringify(allUsers));
+  }, [allUsers]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -69,6 +102,8 @@ const App: React.FC = () => {
     if (user.role === 'employee' && !allUsers.find(u => u.nationalId === user.nationalId)) {
       setAllUsers(prev => [...prev, user]);
     }
+    // مزامنة فورية عند دخول الموظف
+    if (config.syncUrl) syncWithCloud(config.syncUrl);
   };
 
   const handleLogout = () => {
@@ -89,9 +124,21 @@ const App: React.FC = () => {
               {currentUser.role === 'admin' ? <ShieldCheck size={24} /> : <UserIcon size={24} />}
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <h1 className="font-bold text-gray-800 text-lg leading-tight uppercase tracking-wider">Uniteam</h1>
-                {isSyncing && <Cloud size={14} className="text-blue-500 animate-pulse" />}
+                <div className="flex items-center gap-1">
+                  {isSyncing ? (
+                    <RefreshCw size={12} className="text-blue-500 animate-spin" />
+                  ) : syncError ? (
+                    <span title="فشل الاتصال بالسحابة">
+                      <CloudOff size={12} className="text-red-500" />
+                    </span>
+                  ) : (
+                    <span title="متصل بالسحابة">
+                      <Cloud size={12} className="text-green-500" />
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-gray-500 font-medium">{currentUser.fullName}</p>
             </div>
@@ -121,7 +168,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="py-4 text-center text-gray-400 text-xs border-t bg-white/50 backdrop-blur-sm">
-        Uniteam &copy; {new Date().getFullYear()}
+        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| آخر مزامنة: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
       </footer>
     </div>
   );
