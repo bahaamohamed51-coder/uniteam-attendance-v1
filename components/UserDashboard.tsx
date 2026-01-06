@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Branch, AttendanceRecord } from '../types';
-import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, History, RotateCcw } from 'lucide-react';
-import { calculateDistance, formatDate } from '../utils';
+import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, RotateCcw, Cloud } from 'lucide-react';
+import { calculateDistance } from '../utils';
 
 interface UserDashboardProps {
   user: User;
@@ -12,9 +12,19 @@ interface UserDashboardProps {
   googleSheetLink?: string;
   onRefresh?: () => void;
   isSyncing?: boolean;
+  lastUpdated?: string;
 }
 
-const UserDashboard: React.FC<UserDashboardProps> = ({ user, branches, records, setRecords, googleSheetLink, onRefresh, isSyncing }) => {
+const UserDashboard: React.FC<UserDashboardProps> = ({ 
+  user, 
+  branches, 
+  records, 
+  setRecords, 
+  googleSheetLink, 
+  onRefresh, 
+  isSyncing, 
+  lastUpdated 
+}) => {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [locationError, setLocationError] = useState('');
@@ -36,7 +46,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, branches, records, 
         setIsVerifying(false);
       },
       () => {
-        setLocationError('يرجى تفعيل الموقع الجغرافي');
+        setLocationError('يرجى تفعيل GPS');
         setIsVerifying(false);
       },
       { enableHighAccuracy: true }
@@ -45,7 +55,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, branches, records, 
 
   const handleAttendance = async (type: 'check-in' | 'check-out') => {
     if (!selectedBranchId || !currentLocation) {
-      setStatus({ type: 'error', msg: 'يرجى اختيار الفرع وتفعيل الموقع أولاً' });
+      setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' });
       return;
     }
 
@@ -57,7 +67,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, branches, records, 
     if (distance > branch.radius) {
       setStatus({ 
         type: 'error', 
-        msg: `فشل التسجيل: أنت على بعد ${Math.round(distance)} متر من الفرع. المسموح هو ${branch.radius}م.` 
+        msg: `بعيد عن الفرع بمسافة ${Math.round(distance)}م. الحد المسموح ${branch.radius}م.` 
       });
       return;
     }
@@ -100,73 +110,91 @@ const UserDashboard: React.FC<UserDashboardProps> = ({ user, branches, records, 
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-slate-800 rounded-3xl shadow-xl border border-slate-700 p-8 text-white relative overflow-hidden">
-          <button 
-            onClick={onRefresh}
-            disabled={isSyncing}
-            className="absolute left-6 top-6 p-2 bg-slate-900 rounded-full border border-slate-700 text-slate-400 hover:text-blue-400 transition-colors"
-            title="تحديث البيانات من الإدارة"
-          >
-            <RotateCcw size={18} className={isSyncing ? 'animate-spin' : ''} />
-          </button>
+          <div className="absolute left-6 top-6 flex flex-col items-end gap-2">
+            <button 
+              onClick={onRefresh}
+              disabled={isSyncing}
+              className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95"
+              title="تحديث البيانات من السحابة"
+            >
+              <RotateCcw size={20} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
+            </button>
+            {lastUpdated && (
+              <div className="flex items-center gap-1 text-[8px] font-black text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-800 uppercase">
+                <Cloud size={8} /> محدث: {new Date(lastUpdated).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+              </div>
+            )}
+          </div>
 
-          <div className="text-center mb-8">
-             <h2 className="text-3xl font-black text-white mb-2">مرحباً، {user.fullName}</h2>
-             <div className="bg-blue-900/40 px-6 py-2 rounded-2xl text-blue-400 border border-blue-800/50 font-black text-xs inline-block">
-               {user.jobTitle}
+          <div className="text-center mb-8 pt-4">
+             <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">أهلاً، {user.fullName.split(' ')[0]}</h2>
+             <div className="bg-blue-900/30 px-5 py-1.5 rounded-xl text-blue-400 border border-blue-800/40 font-black text-[10px] inline-block uppercase tracking-widest">
+               {user.jobTitle || 'موظف'}
              </div>
              
-             <div className="text-5xl font-black text-white mt-8 mb-2 tracking-tighter">
+             <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">
                 {currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
              </div>
-             <div className="text-slate-400 font-bold text-xs uppercase tracking-widest">
+             <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">
                 {currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
              </div>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 max-w-md mx-auto">
             <div className="space-y-2">
-              <label className="text-xs font-black text-slate-500 mr-2 uppercase tracking-tighter">اختر مكان العمل</label>
-              <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none">
-                <option value="">-- اختر الفرع للتسجيل --</option>
-                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">اختر موقع العمل الحالي</label>
+              <div className="relative">
+                <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none shadow-inner focus:border-blue-500 transition-all">
+                  <option value="">-- اختر الفرع للتسجيل --</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+              </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex items-center justify-between">
+            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex items-center justify-between shadow-inner">
               <div className="flex items-center gap-3">
-                <Navigation size={20} className={isVerifying ? 'animate-spin text-blue-400' : 'text-blue-500'} />
-                <span className={`text-xs font-bold ${currentLocation ? 'text-green-400' : 'text-slate-400'}`}>{currentLocation ? 'الموقع مفعل' : 'الموقع غير محدد'}</span>
+                <div className={`p-2 rounded-lg ${currentLocation ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                  <Navigation size={18} className={isVerifying ? 'animate-spin' : ''} />
+                </div>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${currentLocation ? 'text-green-400' : 'text-slate-500'}`}>
+                  {currentLocation ? 'الموقع الجغرافي مفعل' : 'يرجى تحديد الموقع'}
+                </span>
               </div>
-              <button onClick={getGeolocation} className="px-3 py-1.5 bg-slate-700 text-white rounded-lg font-black text-[10px] uppercase">تحديث الموقع</button>
+              <button onClick={getGeolocation} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-[10px] uppercase transition-all active:scale-95 shadow-lg">تحديث</button>
             </div>
 
             {status.type !== 'none' && (
-              <div className={`p-4 rounded-xl text-xs font-black border flex items-center gap-2 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800' : 'bg-red-900/20 text-red-400 border-red-800'}`}>
-                {status.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+              <div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>
+                {status.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
                 {status.msg}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all">حضور</button>
-              <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-lg active:scale-95 transition-all">انصراف</button>
+              <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
+              <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
             </div>
           </div>
         </div>
       </div>
       
       <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 shadow-xl text-white">
-        <h3 className="font-black mb-6 border-b border-slate-700 pb-4 flex items-center gap-2 text-blue-400 text-sm italic">سجل اليوم</h3>
+        <h3 className="font-black mb-6 border-b border-slate-700 pb-4 flex items-center gap-2 text-blue-400 text-[10px] uppercase tracking-widest">السجل الأخير</h3>
         <div className="space-y-4">
-          {myRecords.map(r => (
-            <div key={r.id} className="p-3 bg-slate-900 rounded-xl border border-slate-700">
-              <div className="flex justify-between font-black text-[10px] mb-1">
-                <span>{r.branchName}</span>
-                <span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span>
+          {myRecords.length === 0 ? (
+            <div className="text-center py-10 opacity-20"><Clock size={40} className="mx-auto" /></div>
+          ) : (
+            myRecords.map(r => (
+              <div key={r.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-700/50 group hover:border-blue-500 transition-all">
+                <div className="flex justify-between font-black text-[10px] mb-1 uppercase tracking-tighter">
+                  <span className="text-slate-300">{r.branchName}</span>
+                  <span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span>
+                </div>
+                <div className="text-[9px] text-slate-500 font-bold">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
               </div>
-              <div className="text-[10px] text-slate-500 font-mono">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
