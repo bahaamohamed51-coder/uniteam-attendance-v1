@@ -46,7 +46,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       return;
     }
     
-    // التحقق من قوة كلمة المرور (6 أرقام على الأقل وليست أصفار فقط)
     if (password.length < 6) {
       setError('كلمة المرور يجب ألا تقل عن 6 أرقام/حروف');
       return;
@@ -102,10 +101,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     onLogin(newUser);
   };
 
-  const handleEmployeeLogin = (e: React.FormEvent) => {
+  const handleEmployeeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // التحقق مما إذا كانت البيانات قد جُلبت من السحابة بعد (لحماية الدخول فور فتح التطبيق)
     if (allUsers.length === 0 && adminConfig.syncUrl) {
        setError('جاري جلب بيانات الموظفين من السحابة، يرجى الانتظار ثانية واحدة...');
        return;
@@ -116,13 +114,32 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
       
-      if (user.deviceId) {
-        if (user.deviceId !== currentDeviceId) {
-          setError('عذراً، هذا الحساب مربوط بهاتف آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة.');
-          return;
-        }
-      } else {
+      // إذا كان الموظف مسجل ولكن تم حذف ربط الجهاز الخاص به من قبل المسؤول
+      if (!user.deviceId || user.deviceId === "") {
+        // ربط الجهاز الجديد تلقائياً
         user.deviceId = currentDeviceId;
+        
+        // إرسال تحديث للسحابة ليتم حفظ الهاتف الجديد فوراً
+        if (adminConfig.googleSheetLink) {
+          try {
+            await fetch(adminConfig.googleSheetLink, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                action: 'updateUserDevice',
+                nationalId: user.nationalId,
+                deviceId: currentDeviceId
+              })
+            });
+            console.log("New device linked successfully");
+          } catch (err) {
+            console.error("Failed to save new device link to cloud", err);
+          }
+        }
+      } else if (user.deviceId !== currentDeviceId) {
+        setError('عذراً، هذا الحساب مربوط بهاتف آخر. يرجى مراجعة المسؤول لفك الارتباط القديم.');
+        return;
       }
       
       onLogin(user);
