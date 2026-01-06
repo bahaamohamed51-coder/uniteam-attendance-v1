@@ -62,7 +62,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const resetDevice = (userId: string) => {
     if (confirm("هل أنت متأكد من حذف ارتباط الجهاز؟ سيتمكن الموظف من التسجيل من هاتف جديد عند أول دخول.")) {
       setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, deviceId: undefined } : u));
-      // يفضل الضغط على مزامنة بعد هذه الخطوة
     }
   };
 
@@ -103,6 +102,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
              onClick={onRefresh}
              disabled={isSyncing}
              className="flex items-center gap-2 px-5 py-3.5 rounded-2xl font-black bg-slate-900 text-blue-400 transition-all shadow-xl text-xs border border-blue-900/30 hover:bg-slate-800"
+             title="جلب أحدث التحديثات من السحابة"
            >
              <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
              تحديث البيانات الحالية
@@ -202,7 +202,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 className="flex items-center gap-2 px-4 py-2 bg-blue-600/10 text-blue-400 border border-blue-900/30 rounded-xl text-[10px] font-black hover:bg-blue-600/20 transition-all"
                >
                  <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-                 تحديث قائمة المسجلين
+                 تحديث البيانات
                </button>
              </div>
              
@@ -232,7 +232,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    </tr>
                  ))}</tbody>
                </table>
-               {allUsers.length === 0 && <div className="text-center py-20 text-slate-600 font-black text-xs uppercase italic tracking-widest">بانتظار تسجيل الموظفين أو سحب البيانات</div>}
              </div>
            </div>
         )}
@@ -285,7 +284,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">رابط الـ Web App (Apps Script)</label>
                     <input type="text" className={inputClasses} value={syncUrl} onChange={e => setSyncUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec" />
-                    <p className="text-[9px] text-slate-500 font-bold px-2">يجب أن يكون الرابط من نوع "Web App" متاح للجميع (Anyone).</p>
                   </div>
                 </div>
               </div>
