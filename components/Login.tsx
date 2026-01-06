@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, AppConfig, Job } from '../types';
-import { UserPlus, LogIn, ShieldAlert, Key, Smartphone, Briefcase, Loader2, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { UserPlus, LogIn, ShieldAlert, Briefcase, Loader2, Link as LinkIcon, Smartphone, AlertCircle } from 'lucide-react';
 import { getDeviceFingerprint } from '../utils';
 
 interface LoginProps {
@@ -13,7 +13,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs, setAdminConfig }) => {
-  const [mode, setMode] = useState<'register' | 'login' | 'admin' | 'connect'>(adminConfig.syncUrl ? 'register' : 'connect');
+  const [mode, setMode] = useState<'register' | 'login' | 'admin' | 'connect'>(adminConfig.syncUrl ? 'login' : 'connect');
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [password, setPassword] = useState('');
@@ -46,13 +46,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       return;
     }
     
+    // منع تسجيل الموظف أكثر من مرة بنفس الرقم القومي
     const existing = allUsers.find(u => u.nationalId === nationalId);
     if (existing) {
-      setError('هذا الرقم القومي مسجل مسبقاً، يرجى تسجيل الدخول');
+      setError('هذا الرقم القومي مسجل مسبقاً، يرجى تسجيل الدخول مباشرة');
       return;
     }
 
     setIsLoading(true);
+    // ربط الحساب ببصمة الجهاز الحالية
     const deviceId = getDeviceFingerprint();
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
@@ -90,14 +92,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     const user = allUsers.find(u => u.nationalId === nationalId && u.password === password);
     
     if (user) {
+      // التحقق من ربط الجهاز
       const currentDeviceId = getDeviceFingerprint();
       if (user.deviceId && user.deviceId !== currentDeviceId) {
-        setError('عذراً، هذا الحساب مربوط بجهاز آخر. يرجى مراجعة المسؤول.');
+        setError('عذراً، هذا الحساب مربوط بجهاز آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة.');
         return;
       }
       onLogin(user);
     } else {
-      setError('بيانات الدخول غير صحيحة');
+      setError('بيانات الدخول غير صحيحة، تأكد من الرقم القومي وكلمة المرور');
     }
   };
 
@@ -125,25 +128,30 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
         <div className="p-8">
           {adminConfig.syncUrl ? (
             <div className="flex bg-slate-900/50 p-1 rounded-2xl mb-8 border border-slate-700">
-              {['register', 'login', 'admin'].map((m) => (
+              {['login', 'register', 'admin'].map((m) => (
                 <button
                   key={m}
                   onClick={() => { setMode(m as any); setError(''); }}
                   className={`flex-1 py-2.5 rounded-xl text-[10px] font-black transition-all ${mode === m ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
                 >
-                  {m === 'register' ? 'تسجيل' : m === 'login' ? 'دخول' : 'إدارة'}
+                  {m === 'login' ? 'دخول' : m === 'register' ? 'تسجيل جديد' : 'إدارة'}
                 </button>
               ))}
             </div>
           ) : mode !== 'admin' && (
             <div className="mb-8 p-4 bg-orange-900/20 border-r-4 border-orange-500 rounded-xl">
               <p className="text-orange-400 text-xs font-bold leading-relaxed">
-                التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" الذي حصلت عليه من المسؤول لتتمكن من التسجيل.
+                التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" من المسؤول للبدء.
               </p>
             </div>
           )}
 
-          {error && <div className="mb-6 p-4 bg-red-900/20 border-r-4 border-red-500 text-red-400 text-xs font-bold">{error}</div>}
+          {error && (
+            <div className="mb-6 p-4 bg-red-900/20 border-r-4 border-red-500 text-red-400 text-xs font-bold flex gap-2 items-start">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
 
           {mode === 'connect' && (
             <form onSubmit={handleConnect} className="space-y-4">
@@ -160,6 +168,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
+              <div className="flex items-center gap-2 mb-2 p-3 bg-blue-900/20 rounded-xl border border-blue-800/50">
+                <Smartphone size={16} className="text-blue-400" />
+                <span className="text-[9px] text-blue-300 font-bold">سيتم ربط حسابك بهذا الهاتف تلقائياً</span>
+              </div>
               <input type="text" placeholder="الاسم الرباعي" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClasses} />
               <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value)} className={inputClasses} />
               <div className="relative">
@@ -176,7 +188,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <input type="password" placeholder="تعيين كلمة مرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
-                {isLoading ? 'جاري الربط...' : 'إنشاء حساب وربط الهاتف'}
+                {isLoading ? 'جاري الربط...' : 'تسجيل وربط الجهاز'}
               </button>
             </form>
           )}
@@ -199,7 +211,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
                 <ShieldAlert size={20} /> دخول لوحة التحكم
               </button>
               {adminConfig.syncUrl ? (
-                 <button type="button" onClick={() => setMode('register')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للتسجيل</button>
+                 <button type="button" onClick={() => setMode('login')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للدخول</button>
               ) : (
                  <button type="button" onClick={() => setMode('connect')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للربط</button>
               )}
