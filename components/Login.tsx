@@ -48,14 +48,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     
     const deviceId = getDeviceFingerprint();
 
-    // 1. التحقق من الرقم القومي في البيانات المسحوبة من السحابة
     const existingById = allUsers.find(u => u.nationalId === nationalId);
     if (existingById) {
       setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام. يرجى تسجيل الدخول.');
       return;
     }
 
-    // 2. التحقق من معرف الجهاز في البيانات المسحوبة من السحابة
     const existingByDevice = allUsers.find(u => u.deviceId === deviceId);
     if (existingByDevice) {
       setError('عذراً، هذا الهاتف مسجل عليه موظف آخر بالفعل (تعدد الحسابات مرفوض).');
@@ -75,7 +73,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
     if (adminConfig.googleSheetLink) {
       try {
-        const response = await fetch(adminConfig.googleSheetLink, {
+        await fetch(adminConfig.googleSheetLink, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
@@ -85,7 +83,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             timestamp: new Date().toISOString()
           })
         });
-        // ملاحظة: مع mode: 'no-cors' لا يمكن قراءة رد السيرفر، لكننا قمنا بالتحقق المسبق محلياً
       } catch (err) {
         console.error("Cloud registration failed", err);
       }
@@ -97,12 +94,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
   const handleEmployeeLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // البحث عن المستخدم مع التأكد من مطابقة كلمة المرور المحفوظة في السحابة
     const user = allUsers.find(u => u.nationalId === nationalId && u.password === password);
     
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
       
-      // Strict Device Binding Logic
       if (user.deviceId) {
         if (user.deviceId !== currentDeviceId) {
           setError('عذراً، هذا الحساب مربوط بهاتف آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة.');
@@ -209,7 +206,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
           {mode === 'login' && (
             <form onSubmit={handleEmployeeLogin} className="space-y-4">
-              <input type="text" placeholder="الرقم القومي" value={nationalId} onChange={e => setNationalId(e.target.value)} className={inputClasses} />
+              <input 
+                type="text" 
+                placeholder="الرقم القومي (14 رقم)" 
+                maxLength={14} 
+                value={nationalId} 
+                onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} 
+                className={inputClasses} 
+              />
               <input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 <LogIn size={20} /> دخول الموظف
