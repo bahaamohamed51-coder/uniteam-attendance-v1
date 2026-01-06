@@ -46,14 +46,23 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       return;
     }
     
-    const existing = allUsers.find(u => u.nationalId === nationalId);
-    if (existing) {
-      setError('هذا الرقم القومي مسجل مسبقاً، يرجى تسجيل الدخول مباشرة');
+    const deviceId = getDeviceFingerprint();
+
+    // 1. التحقق من الرقم القومي في البيانات المسحوبة من السحابة
+    const existingById = allUsers.find(u => u.nationalId === nationalId);
+    if (existingById) {
+      setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام. يرجى تسجيل الدخول.');
+      return;
+    }
+
+    // 2. التحقق من معرف الجهاز في البيانات المسحوبة من السحابة
+    const existingByDevice = allUsers.find(u => u.deviceId === deviceId);
+    if (existingByDevice) {
+      setError('عذراً، هذا الهاتف مسجل عليه موظف آخر بالفعل (تعدد الحسابات مرفوض).');
       return;
     }
 
     setIsLoading(true);
-    const deviceId = getDeviceFingerprint();
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       fullName,
@@ -66,7 +75,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
     if (adminConfig.googleSheetLink) {
       try {
-        await fetch(adminConfig.googleSheetLink, {
+        const response = await fetch(adminConfig.googleSheetLink, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
@@ -76,6 +85,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             timestamp: new Date().toISOString()
           })
         });
+        // ملاحظة: مع mode: 'no-cors' لا يمكن قراءة رد السيرفر، لكننا قمنا بالتحقق المسبق محلياً
       } catch (err) {
         console.error("Cloud registration failed", err);
       }
@@ -94,15 +104,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       
       // Strict Device Binding Logic
       if (user.deviceId) {
-        // If account is linked to a device, it must match current device
         if (user.deviceId !== currentDeviceId) {
-          setError('عذراً، هذا الحساب مربوط بهاتف آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة. يرجى مراجعة المسؤول لفك الارتباط إذا كان هذا هاتفك الجديد.');
+          setError('عذراً، هذا الحساب مربوط بهاتف آخر. لا يمكن الدخول إلا من الهاتف المسجل به أول مرة.');
           return;
         }
       } else {
-        // If deviceId is empty (e.g., admin reset it), bind the current device automatically
         user.deviceId = currentDeviceId;
-        // The update will persist because handleLogin updates states and App.tsx saves to localStorage
       }
       
       onLogin(user);
@@ -177,7 +184,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="flex items-center gap-2 mb-2 p-3 bg-blue-900/20 rounded-xl border border-blue-800/50">
                 <Smartphone size={16} className="text-blue-400" />
-                <span className="text-[9px] text-blue-300 font-bold">سيتم ربط حسابك بهذا الهاتف تلقائياً</span>
+                <span className="text-[9px] text-blue-300 font-bold">سيتم ربط حسابك بهذا الهاتف تلقائياً ولن يعمل على غيره</span>
               </div>
               <input type="text" placeholder="الاسم الرباعي" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClasses} />
               <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value)} className={inputClasses} />
@@ -195,7 +202,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <input type="password" placeholder="تعيين كلمة مرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
-                {isLoading ? 'جاري الربط...' : 'تسجيل وربط الجهاز'}
+                {isLoading ? 'جاري التحقق...' : 'تسجيل وربط الجهاز'}
               </button>
             </form>
           )}
