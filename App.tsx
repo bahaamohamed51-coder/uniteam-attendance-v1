@@ -44,7 +44,12 @@ const App: React.FC = () => {
         localStorage.setItem('attendance_jobs', JSON.stringify(data.jobs));
       }
       
-      const updatedConfig = { ...config, lastUpdated: new Date().toISOString(), syncUrl: url, googleSheetLink: url };
+      const updatedConfig = { 
+        ...config, 
+        lastUpdated: new Date().toISOString(), 
+        syncUrl: url, 
+        googleSheetLink: url 
+      };
       setConfig(updatedConfig);
       localStorage.setItem('attendance_config', JSON.stringify(updatedConfig));
     } catch (err) {
@@ -64,17 +69,16 @@ const App: React.FC = () => {
         const decodedUrl = atob(cloudUrlEncoded);
         if (decodedUrl.startsWith('http')) {
           syncWithCloud(decodedUrl);
-          // تنظيف الرابط للحفاظ على الخصوصية
+          // تنظيف الرابط من المتصفح
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       } catch (e) {
         console.error("رابط الربط غير صالح");
       }
     } else if (config.syncUrl) {
-      // مزامنة تلقائية عند فتح التطبيق إذا كان هناك رابط مسجل
       syncWithCloud(config.syncUrl);
     }
-  }, []);
+  }, [syncWithCloud]);
 
   // تحميل البيانات المحلية
   useEffect(() => {
@@ -166,9 +170,12 @@ const App: React.FC = () => {
             />
           ) : (
             <UserDashboard 
-              user={currentUser} branches={branches} records={records} setRecords={setRecords}
+              user={currentUser} 
+              branches={branches} 
+              records={records} 
+              setRecords={setRecords}
               googleSheetLink={config.googleSheetLink}
-              onRefresh={() => config.syncUrl && syncWithCloud(config.syncUrl)}
+              onRefresh={() => { if (config.syncUrl) syncWithCloud(config.syncUrl); }}
               isSyncing={isSyncing}
               lastUpdated={config.lastUpdated}
             />
