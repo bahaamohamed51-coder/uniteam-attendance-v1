@@ -1,7 +1,8 @@
 
 import React, { useState, useRef } from 'react';
 import { Branch, AttendanceRecord, AppConfig, User, Job } from '../types';
-import { MapPin, Table, Trash2, Shield, CloudUpload, Briefcase, RotateCcw, Globe, Users, Plus, FileSpreadsheet, Download, Share2, AlertTriangle, Smartphone, RefreshCw, Edit2, Check, X } from 'lucide-react';
+// Fix: Replaced TabletOff with Unlink as TabletOff is not exported by lucide-react
+import { MapPin, Table, Trash2, Shield, CloudUpload, Briefcase, RotateCcw, Globe, Users, Plus, FileSpreadsheet, Download, Share2, AlertTriangle, Smartphone, RefreshCw, Edit2, Check, X, Unlink } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface AdminDashboardProps {
@@ -26,7 +27,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newJobTitle, setNewJobTitle] = useState('');
   const [isPushing, setIsPushing] = useState(false);
   
-  // حالات التعديل (Inline Editing)
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
   const [editBranchData, setEditBranchData] = useState<Partial<Branch>>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -160,6 +160,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setEditingUserId(null);
   };
 
+  const handleClearAllBranches = () => {
+    if (window.confirm("هل أنت متأكد من حذف جميع الفروع؟ لا يمكن التراجع عن هذه الخطوة.")) {
+      setBranches([]);
+    }
+  };
+
+  const handleClearAllJobs = () => {
+    if (window.confirm("هل أنت متأكد من حذف جميع الوظائف؟")) {
+      setJobs([]);
+    }
+  };
+
+  const handleUnlinkDevice = (userId: string) => {
+    if (window.confirm("سيتم حذف ربط الهاتف لهذا الموظف، مما يتيح له تسجيل الدخول من هاتف جديد. هل تريد الاستمرار؟")) {
+      setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, deviceId: "" } : u));
+      alert("تم فك الارتباط، يرجى الضغط على 'حفظ في السحابة' لتأكيد التغيير.");
+    }
+  };
+
   const inputClasses = "px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-white font-bold outline-none focus:border-blue-500 w-full transition-all";
 
   return (
@@ -214,6 +233,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex justify-between items-center">
                <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest flex items-center gap-2">الفروع الحالية</h4>
                <div className="flex gap-2">
+                  <button onClick={handleClearAllBranches} className="flex items-center gap-2 px-4 py-2 bg-red-600/10 text-red-400 border border-red-900/20 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black transition-all">
+                    <Trash2 size={14}/> حذف جميع الفروع
+                  </button>
                   <button onClick={() => downloadTemplate('branches')} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-[10px] font-black"><Download size={14}/> نموذج</button>
                   <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-[10px] font-black"><FileSpreadsheet size={14}/> استيراد</button>
                </div>
@@ -332,8 +354,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              </>
                            ) : (
                              <>
+                               {user.deviceId && (
+                                 <button onClick={() => handleUnlinkDevice(user.id)} title="حذف ربط الجهاز" className="text-orange-400 hover:bg-orange-900/20 p-1.5 rounded">
+                                   {/* Fix: Replaced non-existent TabletOff icon with Unlink icon */}
+                                   <Unlink size={16}/>
+                                 </button>
+                               )}
                                <button onClick={() => { setEditingUserId(user.id); setEditUserData(user); }} className="text-blue-400 hover:bg-blue-900/20 p-1.5 rounded"><Edit2 size={16}/></button>
-                               <button onClick={() => setAllUsers(allUsers.filter(u => u.id !== user.id))} className="text-slate-500 hover:text-red-500 p-1.5"><Trash2 size={16}/></button>
+                               <button onClick={() => setAllUsers(allUsers.filter(u => u.id !== user.id))} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
                              </>
                            )}
                         </div>
@@ -350,6 +378,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="flex justify-between items-center">
                <h4 className="text-sm font-black text-blue-400 uppercase tracking-widest">الوظائف المتاحة</h4>
                <div className="flex gap-2">
+                  <button onClick={handleClearAllJobs} className="flex items-center gap-2 px-4 py-2 bg-red-600/10 text-red-400 border border-red-900/20 hover:bg-red-600 hover:text-white rounded-xl text-[10px] font-black transition-all">
+                    <Trash2 size={14}/> حذف جميع الوظائف
+                  </button>
                   <button onClick={() => downloadTemplate('jobs')} className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-[10px] font-black"><Download size={14}/> نموذج</button>
                   <button onClick={() => jobFileInputRef.current?.click()} className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 rounded-xl text-[10px] font-black"><FileSpreadsheet size={14}/> استيراد</button>
                </div>
