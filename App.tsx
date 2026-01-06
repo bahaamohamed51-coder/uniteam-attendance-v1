@@ -34,12 +34,14 @@ const App: React.FC = () => {
       if (!response.ok) throw new Error('فشل الاتصال');
       const data = await response.json();
       
-      // تحديث الفروع والوظائف فقط إذا كان الموظف أو إذا طلب المسؤول ذلك يدوياً
+      // Update branches and jobs
       if (data.branches) setBranches(data.branches);
       if (data.jobs) setJobs(data.jobs);
       
-      // تحديث قائمة الموظفين إذا كانت موجودة في الاستجابة (اختياري حسب منطق الـ backend)
-      if (data.users && Array.isArray(data.users)) setAllUsers(data.users);
+      // Update users from cloud if available
+      if (data.users && Array.isArray(data.users)) {
+        setAllUsers(data.users);
+      }
       
       const updatedConfig = { 
         ...config, 
@@ -71,7 +73,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // إيقاف المزامنة التلقائية للمسؤول لحماية بياناته المحلية من الدهس
+    // Prevent auto-sync for admin to avoid overwriting local changes unless manual refresh is clicked
     if (currentUser?.role === 'admin') return;
 
     const params = new URLSearchParams(window.location.search);
@@ -98,8 +100,15 @@ const App: React.FC = () => {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('attendance_current_user', JSON.stringify(user));
-    if (user.role === 'employee' && !allUsers.find(u => u.nationalId === user.nationalId)) {
-      setAllUsers(prev => [...prev, user]);
+    // Ensure the logged in user is in allUsers if they are an employee
+    if (user.role === 'employee') {
+      setAllUsers(prev => {
+        const exists = prev.find(u => u.nationalId === user.nationalId);
+        if (exists) {
+           return prev.map(u => u.nationalId === user.nationalId ? user : u);
+        }
+        return [...prev, user];
+      });
     }
   };
 
