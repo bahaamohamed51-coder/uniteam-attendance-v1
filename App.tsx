@@ -114,6 +114,12 @@ const App: React.FC = () => {
     localStorage.removeItem('attendance_current_user');
   };
 
+  const handleRefresh = () => {
+    if (config.syncUrl) {
+      syncWithCloud(config.syncUrl);
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col relative z-10">
       <header className="bg-white/90 backdrop-blur-md border-b border-gray-200 sticky top-0 z-50 transition-all">
@@ -175,7 +181,7 @@ const App: React.FC = () => {
               records={records} 
               setRecords={setRecords}
               googleSheetLink={config.googleSheetLink}
-              onRefresh={() => { if (config.syncUrl) syncWithCloud(config.syncUrl); }}
+              onRefresh={handleRefresh}
               isSyncing={isSyncing}
               lastUpdated={config.lastUpdated}
             />
