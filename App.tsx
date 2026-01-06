@@ -37,6 +37,7 @@ const App: React.FC = () => {
       if (data.branches) setBranches(data.branches);
       if (data.jobs) setJobs(data.jobs);
       
+      // قراءة بيانات الموظفين مباشرة من السحابة دون حفظها في المتصفح بشكل دائم
       if (data.users && Array.isArray(data.users)) {
         setAllUsers(data.users);
       }
@@ -57,17 +58,16 @@ const App: React.FC = () => {
   }, [config]);
 
   useEffect(() => {
+    // استعادة حالة المستخدم فقط، أما قائمة الموظفين فتجلب من السحابة دائماً
     const savedUser = localStorage.getItem('attendance_current_user');
     const savedBranches = localStorage.getItem('attendance_branches');
     const savedJobs = localStorage.getItem('attendance_jobs');
-    const savedRecords = localStorage.getItem('attendance_records');
-    const savedAllUsers = localStorage.getItem('attendance_all_users');
 
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
     if (savedBranches) setBranches(JSON.parse(savedBranches));
     if (savedJobs) setJobs(JSON.parse(savedJobs));
-    if (savedRecords) setRecords(JSON.parse(savedRecords));
-    if (savedAllUsers) setAllUsers(JSON.parse(savedAllUsers));
+    
+    // ملاحظة: تم إزالة استعادة records و allUsers من localStorage لضمان الخصوصية والمزامنة
   }, []);
 
   useEffect(() => {
@@ -89,23 +89,13 @@ const App: React.FC = () => {
     }
   }, [syncWithCloud, currentUser?.role, config.syncUrl]);
 
+  // حفظ الفروع والوظائف فقط محلياً للسرعة، أما بيانات الموظفين والسجلات فهي سحابية فقط
   useEffect(() => { localStorage.setItem('attendance_branches', JSON.stringify(branches)); }, [branches]);
   useEffect(() => { localStorage.setItem('attendance_jobs', JSON.stringify(jobs)); }, [jobs]);
-  useEffect(() => { localStorage.setItem('attendance_records', JSON.stringify(records)); }, [records]);
-  useEffect(() => { localStorage.setItem('attendance_all_users', JSON.stringify(allUsers)); }, [allUsers]);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     localStorage.setItem('attendance_current_user', JSON.stringify(user));
-    if (user.role === 'employee') {
-      setAllUsers(prev => {
-        const exists = prev.find(u => u.nationalId === user.nationalId);
-        if (exists) {
-           return prev.map(u => u.nationalId === user.nationalId ? user : u);
-        }
-        return [...prev, user];
-      });
-    }
   };
 
   const handleLogout = () => {
@@ -175,7 +165,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="py-4 text-center text-gray-400 text-[10px] font-bold border-t">
-        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| آخر مزامنة: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
+        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| بيانات مباشرة من السحابة | آخر تحديث: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
       </footer>
     </div>
   );
