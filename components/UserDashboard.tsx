@@ -9,9 +9,9 @@ interface UserDashboardProps {
   branches: Branch[];
   records: AttendanceRecord[];
   setRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
-  googleSheetLink?: string;
-  onRefresh?: () => void;
-  isSyncing?: boolean;
+  googleSheetLink: string; // جعلناها إجبارية لتتوافق مع تمريرها في App
+  onRefresh: () => void;
+  isSyncing: boolean;
   lastUpdated?: string;
 }
 
@@ -27,7 +27,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
 }) => {
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
-  const [locationError, setLocationError] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
 
@@ -39,14 +38,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
 
   const getGeolocation = () => {
     setIsVerifying(true);
-    setLocationError('');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setIsVerifying(false);
       },
       () => {
-        setLocationError('يرجى تفعيل GPS');
+        alert('يرجى تفعيل GPS');
         setIsVerifying(false);
       },
       { enableHighAccuracy: true }
@@ -115,7 +113,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
               onClick={onRefresh}
               disabled={isSyncing}
               className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95"
-              title="تحديث البيانات من السحابة"
             >
               <RotateCcw size={20} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
             </button>
@@ -165,7 +162,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
 
             {status.type !== 'none' && (
-              <div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 animate-in fade-in slide-in-from-top-2 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>
+              <div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>
                 {status.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
                 {status.msg}
               </div>
