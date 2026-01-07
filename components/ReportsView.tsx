@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar, MapPin, User as UserIcon, Briefcase } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar, MapPin, User as UserIcon, Briefcase, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsViewProps {
@@ -14,6 +14,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
   const [error, setError] = useState('');
+
+  // فلاتر التاريخ
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +42,31 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     }
   };
 
+  const filteredRecords = useMemo(() => {
+    if (!fromDate && !toDate) return records;
+    
+    return records.filter(r => {
+      const recordDate = new Date(r.date);
+      // ضبط الوقت للصفر للمقارنة باليوم فقط
+      recordDate.setHours(0, 0, 0, 0);
+      
+      let match = true;
+      if (fromDate) {
+        const f = new Date(fromDate);
+        f.setHours(0, 0, 0, 0);
+        match = match && recordDate >= f;
+      }
+      if (toDate) {
+        const t = new Date(toDate);
+        t.setHours(0, 0, 0, 0);
+        match = match && recordDate <= t;
+      }
+      return match;
+    });
+  }, [records, fromDate, toDate]);
+
   const exportToExcel = () => {
-    const dataToExport = records.map(r => ({
+    const dataToExport = filteredRecords.map(r => ({
       'التاريخ': new Date(r.date).toLocaleDateString('ar-EG'),
       'الوقت': new Date(r.time).toLocaleTimeString('ar-EG'),
       'اسم الموظف': r.name,
@@ -127,6 +154,41 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
         </div>
       </div>
 
+      {/* شريط الفلاتر */}
+      <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg space-y-4">
+        <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
+           <Filter size={14} /> تصفية السجل حسب التاريخ
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">من تاريخ</label>
+            <input 
+              type="date" 
+              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">إلى تاريخ</label>
+            <input 
+              type="date" 
+              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+             <button 
+               onClick={() => { setFromDate(''); setToDate(''); }}
+               className="w-full md:w-auto px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all"
+             >
+               إعادة تعيين الفلتر
+             </button>
+          </div>
+        </div>
+      </div>
+
       <div className="bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-right min-w-[800px]">
@@ -140,12 +202,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-700/50">
-              {records.length === 0 ? (
+              {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center text-slate-500 font-bold">لا توجد بيانات مسجلة لهذه الوظائف حالياً</td>
+                  <td colSpan={5} className="py-20 text-center text-slate-500 font-bold">لا توجد بيانات مسجلة مطابقة للفلاتر حالياً</td>
                 </tr>
               ) : (
-                records.map((r, idx) => (
+                filteredRecords.map((r, idx) => (
                   <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
                     <td className="py-4 px-4">
                       <div className="flex items-center gap-3">
