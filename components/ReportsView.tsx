@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X, Link as LinkIcon, AlertCircle } from 'lucide-react';
+import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X, Link as LinkIcon, AlertCircle, Check } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsViewProps {
@@ -95,7 +95,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
   // فلاتر التاريخ والوظيفة
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [selectedJob, setSelectedJob] = useState('');
+  const [selectedJobs, setSelectedJobs] = useState<string[]>([]); // تغيير إلى مصفوفة لاختيار متعدد
 
   const activeSyncUrl = localSyncUrl || initialSyncUrl;
 
@@ -149,7 +149,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
   }, [records]);
 
   const filteredRecords = useMemo(() => {
-    if (!fromDate && !toDate && !selectedJob) return records;
+    if (!fromDate && !toDate && selectedJobs.length === 0) return records;
     
     return records.filter(r => {
       const recordDate = new Date(r.date);
@@ -166,12 +166,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
         t.setHours(0, 0, 0, 0);
         match = match && recordDate <= t;
       }
-      if (selectedJob) {
-        match = match && r.job === selectedJob;
+      if (selectedJobs.length > 0) {
+        match = match && selectedJobs.includes(r.job);
       }
       return match;
     });
-  }, [records, fromDate, toDate, selectedJob]);
+  }, [records, fromDate, toDate, selectedJobs]);
+
+  const toggleJobSelection = (job: string) => {
+    setSelectedJobs(prev => 
+      prev.includes(job) ? prev.filter(j => j !== job) : [...prev, job]
+    );
+  };
 
   const exportToExcel = () => {
     const dataToExport = filteredRecords.map(r => ({
@@ -300,28 +306,33 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
           <CustomDatePicker label="من تاريخ" value={fromDate} onChange={setFromDate} placeholder="اختر البداية" />
           <CustomDatePicker label="إلى تاريخ" value={toDate} onChange={setToDate} placeholder="اختر النهاية" />
 
-          <div className="space-y-1 text-right">
-            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">تصفية بالوظيفة</label>
-            <div className="relative">
-              <select 
-                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none cursor-pointer text-right"
-                value={selectedJob}
-                onChange={e => setSelectedJob(e.target.value)}
-              >
-                <option value="">كل الوظائف المتاحة</option>
-                {availableJobs.map(job => (
-                  <option key={job} value={job}>{job}</option>
-                ))}
-              </select>
-              <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+          <div className="space-y-1 text-right lg:col-span-2">
+            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase tracking-widest">تصفية بالوظائف (اختيار متعدد)</label>
+            <div className="flex flex-wrap gap-2 p-3 bg-slate-900 border border-slate-700 rounded-2xl min-h-[48px] shadow-inner">
+              {availableJobs.map(job => (
+                <button
+                  key={job}
+                  onClick={() => toggleJobSelection(job)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all flex items-center gap-1.5 border ${
+                    selectedJobs.includes(job) 
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-lg' 
+                      : 'bg-slate-800 text-slate-500 border-slate-700 hover:text-slate-300'
+                  }`}
+                >
+                  {selectedJobs.includes(job) && <Check size={12} />}
+                  {job}
+                </button>
+              ))}
+              {availableJobs.length === 0 && <span className="text-[10px] text-slate-600 font-bold italic py-1">لا توجد وظائف متاحة حالياً</span>}
             </div>
           </div>
-          <div className="flex items-end">
+          
+          <div className="lg:col-start-4">
              <button 
-               onClick={() => { setFromDate(''); setToDate(''); setSelectedJob(''); }}
-               className="w-full px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all flex justify-center items-center gap-2"
+               onClick={() => { setFromDate(''); setToDate(''); setSelectedJobs([]); }}
+               className="w-full px-6 py-3.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all flex justify-center items-center gap-2 shadow-lg"
              >
-               <X size={14} /> مسح الفلاتر
+               <X size={14} /> مسح جميع الفلاتر
              </button>
           </div>
         </div>
@@ -331,8 +342,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
         <p className="text-slate-500 text-xs font-black uppercase tracking-widest">
           تم إخفاء عرض الجدول المباشر. يمكنك استخدام الفلاتر أعلاه ثم الضغط على "تحميل Excel" لاستخراج التقارير.
         </p>
-        <div className="mt-4 text-[10px] text-blue-500 font-bold uppercase">
-          عدد السجلات المفلترة حالياً: {filteredRecords.length}
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <div className="text-[10px] text-blue-500 font-bold uppercase flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+            عدد السجلات المفلترة حالياً: {filteredRecords.length}
+          </div>
+          {selectedJobs.length > 0 && (
+            <div className="text-[9px] text-slate-600 font-bold uppercase">
+              وظائف مختارة: {selectedJobs.join('، ')}
+            </div>
+          )}
         </div>
       </div>
     </div>
