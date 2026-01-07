@@ -233,7 +233,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
           <h2 className="text-xl font-black text-blue-400 flex items-center gap-2">
             <Table size={24} /> تقرير بيانات الموظفين
           </h2>
-          <p className="text-slate-500 text-[10px] font-black uppercase">مرحباً {username} | البيانات مفلترة حسب صلاحياتك</p>
+          <p className="text-slate-500 text-[10px] font-black uppercase">مرحباً {username}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button 
@@ -305,64 +305,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
           </div>
         </div>
       </div>
-
-      <div className="bg-slate-800 rounded-3xl border border-slate-700 shadow-2xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-right min-w-[800px]">
-            <thead>
-              <tr className="bg-slate-900/50 border-b border-slate-700 text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                <th className="py-5 px-4">الموظف</th>
-                <th className="py-5 px-4">الوظيفة</th>
-                <th className="py-5 px-4">الفرع</th>
-                <th className="py-5 px-4 text-center">الحالة</th>
-                <th className="py-5 px-4">التاريخ والوقت</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-700/50">
-              {filteredRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-20 text-center text-slate-500 font-bold">لا توجد سجلات مطابقة للفلاتر المختارة</td>
-                </tr>
-              ) : (
-                filteredRecords.map((r, idx) => (
-                  <tr key={idx} className="hover:bg-slate-900/30 transition-colors">
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-slate-700 p-2 rounded-lg text-blue-400"><UserIcon size={14} /></div>
-                        <div>
-                          <div className="text-white font-bold text-sm">{r.name}</div>
-                          <div className="text-[10px] text-slate-500 font-mono">{r.nationalId}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2 text-blue-400 font-black text-[10px]">
-                        <Briefcase size={12} /> {r.job}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex items-center gap-2 text-slate-300 font-bold text-[10px]">
-                        <MapPin size={12} className="text-slate-500" /> {r.branch}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className={`mx-auto w-fit px-3 py-1 rounded-full text-[9px] font-black border ${r.type === 'check-in' ? 'bg-green-600/10 text-green-400 border-green-900/30' : 'bg-orange-600/10 text-orange-400 border-orange-900/30'}`}>
-                        {r.type === 'check-in' ? 'حضور' : 'انصراف'}
-                      </div>
-                    </td>
-                    <td className="py-4 px-4">
-                      <div className="flex flex-col items-end">
-                        <div className="text-white font-mono text-xs">{new Date(r.time).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
-                        <div className="text-[9px] text-slate-500 font-bold flex items-center gap-1"><CalendarIcon size={10} /> {new Date(r.date).toLocaleDateString('ar-EG')}</div>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      
+      {/* تم إزالة جدول عرض البيانات بناءً على طلب المستخدم لإظهار الفلاتر فقط */}
     </div>
   );
 };
