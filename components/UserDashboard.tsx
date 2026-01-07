@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Branch, AttendanceRecord } from '../types';
-import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, RotateCcw, Cloud } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, RotateCcw, Cloud, WifiOff } from 'lucide-react';
 import { calculateDistance } from '../utils';
 
 interface UserDashboardProps {
@@ -9,7 +9,7 @@ interface UserDashboardProps {
   branches: Branch[];
   records: AttendanceRecord[];
   setRecords: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
-  googleSheetLink: string; // جعلناها إجبارية لتتوافق مع تمريرها في App
+  googleSheetLink: string;
   onRefresh: () => void;
   isSyncing: boolean;
   lastUpdated?: string;
@@ -26,7 +26,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   lastUpdated 
 }) => {
   const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number } | null>(null);
+  // أضفنا الـ timestamp لمتابعة وقت آخر تحديث للموقع
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
 
@@ -40,11 +41,19 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     setIsVerifying(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setCurrentLocation({ 
+          lat: pos.coords.latitude, 
+          lng: pos.coords.longitude,
+          timestamp: Date.now() 
+        });
         setIsVerifying(false);
+        // مسح رسائل الخطأ المتعلقة بالموقع عند التحديث بنجاح
+        if (status.msg.includes('الموقع الجغرافي قديم')) {
+          setStatus({ type: 'none', msg: '' });
+        }
       },
       () => {
-        alert('يرجى تفعيل GPS');
+        alert('يرجى تفعيل GPS ومنح صلاحية الوصول للموقع');
         setIsVerifying(false);
       },
       { enableHighAccuracy: true }
@@ -52,8 +61,27 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   };
 
   const handleAttendance = async (type: 'check-in' | 'check-out') => {
+    // 1. التحقق من الاتصال بالإنترنت
+    if (!navigator.onLine) {
+      setStatus({ 
+        type: 'error', 
+        msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت. يرجى تفعيل البيانات أو الواي فاي.' 
+      });
+      return;
+    }
+
     if (!selectedBranchId || !currentLocation) {
       setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' });
+      return;
+    }
+
+    // 2. التحقق من حداثة الموقع (أقل من دقيقة واحدة = 60000 مللي ثانية)
+    const locationAge = Date.now() - currentLocation.timestamp;
+    if (locationAge > 60000) {
+      setStatus({ 
+        type: 'error', 
+        msg: 'بيانات الموقع قديمة (مر عليها أكثر من دقيقة). يرجى تحديث الموقع قبل التسجيل.' 
+      });
       return;
     }
 
@@ -104,6 +132,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
 
   const myRecords = records.filter(r => r.userId === user.id).slice(-5).reverse();
 
+  // حساب الثواني المتبقية لصلاحية الموقع (للعرض فقط)
+  const locationAgeSeconds = currentLocation ? Math.floor((Date.now() - currentLocation.timestamp) / 1000) : 0;
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
@@ -138,6 +169,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
           </div>
 
           <div className="space-y-6 max-w-md mx-auto">
+            {!navigator.onLine && (
+              <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-400 text-[10px] font-black uppercase">
+                <WifiOff size={16} /> الهاتف غير متصل بالإنترنت حالياً
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">اختر موقع العمل الحالي</label>
               <div className="relative">
@@ -149,28 +186,45 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex items-center justify-between shadow-inner">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${currentLocation ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
-                  <Navigation size={18} className={isVerifying ? 'animate-spin' : ''} />
+            <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex flex-col gap-3 shadow-inner">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${currentLocation && locationAgeSeconds < 60 ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                    <Navigation size={18} className={isVerifying ? 'animate-spin' : ''} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${currentLocation && locationAgeSeconds < 60 ? 'text-green-400' : 'text-slate-500'}`}>
+                      {currentLocation ? (locationAgeSeconds < 60 ? 'الموقع الجغرافي مُحدّث' : 'الموقع بحاجة لتحديث') : 'يرجى تحديد الموقع'}
+                    </span>
+                    {currentLocation && (
+                      <span className="text-[8px] text-slate-500 font-bold uppercase mt-0.5">منذ {locationAgeSeconds} ثانية</span>
+                    )}
+                  </div>
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${currentLocation ? 'text-green-400' : 'text-slate-500'}`}>
-                  {currentLocation ? 'الموقع الجغرافي مفعل' : 'يرجى تحديد الموقع'}
-                </span>
+                <button onClick={getGeolocation} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-[10px] uppercase transition-all active:scale-95 shadow-lg">تحديث</button>
               </div>
-              <button onClick={getGeolocation} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-[10px] uppercase transition-all active:scale-95 shadow-lg">تحديث</button>
             </div>
 
             {status.type !== 'none' && (
               <div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>
-                {status.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
-                {status.msg}
+                {status.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle size={20} className="shrink-0" />}
+                <span className="leading-relaxed">{status.msg}</span>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
-              <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
+              <button 
+                onClick={() => handleAttendance('check-in')} 
+                className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                حضور
+              </button>
+              <button 
+                onClick={() => handleAttendance('check-out')} 
+                className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                انصراف
+              </button>
             </div>
           </div>
         </div>
