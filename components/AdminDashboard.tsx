@@ -80,7 +80,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const wb = XLSX.read(bstr, { type: 'binary' });
         const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         if (type === 'branches') {
-          // Fixed potential inference error by ensuring Dispatch type is correctly used
           setBranches(prev => [...prev, ...data.map((item: any) => ({
             id: Math.random().toString(36).substr(2, 9),
             name: item["اسم الفرع"] || 'فرع جديد',
@@ -89,7 +88,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             radius: parseInt(item["النطاق بالمتر"] || 100)
           }))]);
         } else {
-          // Fixed potential inference error by ensuring Dispatch type is correctly used
           setJobs(prev => [...prev, ...data.map((item: any) => ({
             id: Math.random().toString(36).substr(2, 9),
             title: item["اسم الوظيفة"] || 'موظف'
@@ -124,7 +122,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const saveEditBranch = (id: string) => {
-    setBranches(prev => prev.map(b => b.id === id ? { ...b, ...editBranchData } : b));
+    setBranches(prev => prev.map(b => b.id === id ? { ...b, ...editBranchData } as Branch : b));
     setEditingBranchId(null);
   };
 
@@ -141,7 +139,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       password: newRepPass,
       allowedJobs: selectedJobsForAcc
     };
-    // Fix: Using optional chaining for optional dispatch prop
     setReportAccounts?.([...reportAccounts, newAcc]);
     setNewRepUser(''); setNewRepPass(''); setSelectedJobsForAcc([]);
   };
@@ -151,7 +148,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       alert("يرجى التأكد من اسم المستخدم وكلمة المرور واختيار وظيفة واحدة على الأقل");
       return;
     }
-    // Fix: Using optional chaining for optional dispatch prop and type safety
     setReportAccounts?.(prev => prev.map(acc => acc.id === id ? { ...acc, ...editReportData } as ReportAccount : acc));
     setEditingReportId(null);
   };
@@ -229,15 +225,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-right min-w-[600px]">
-                <thead><tr className="border-b border-slate-700 text-[10px] font-black text-slate-500 uppercase tracking-widest"><th className="py-4 px-2">اسم الفرع</th><th className="py-4 px-2">الإحداثيات</th><th className="py-4 px-2 text-center">النطاق</th><th className="py-4 px-2 text-center">إجراءات</th></tr></thead>
+              <table className="w-full text-right min-w-[700px]">
+                <thead><tr className="border-b border-slate-700 text-[10px] font-black text-slate-500 uppercase tracking-widest"><th className="py-4 px-2">اسم الفرع</th><th className="py-4 px-2">إحداثيات (Lat, Lng)</th><th className="py-4 px-2 text-center">النطاق</th><th className="py-4 px-2 text-center">إجراءات</th></tr></thead>
                 <tbody>{branches.map(b => (
                   <tr key={b.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-colors">
-                    <td className="py-4 px-2 font-bold">{editingBranchId === b.id ? <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs" value={editBranchData.name} onChange={e => setEditBranchData({...editBranchData, name: e.target.value})} /> : b.name}</td>
-                    <td className="py-4 px-2 text-[10px] text-slate-400 font-mono">{b.latitude.toFixed(4)}, {b.longitude.toFixed(4)}</td>
-                    <td className="py-4 px-2 text-center text-blue-400 font-black">{b.radius}م</td>
+                    <td className="py-4 px-2 font-bold">
+                      {editingBranchId === b.id ? (
+                        <input className="bg-slate-900 border border-blue-500 rounded px-3 py-1.5 text-xs w-full outline-none" value={editBranchData.name || ''} onChange={e => setEditBranchData({...editBranchData, name: e.target.value})} />
+                      ) : b.name}
+                    </td>
+                    <td className="py-4 px-2">
+                      {editingBranchId === b.id ? (
+                        <div className="flex gap-1">
+                          <input type="number" step="0.000001" className="bg-slate-900 border border-blue-500 rounded px-2 py-1.5 text-[10px] w-full font-mono outline-none" placeholder="Lat" value={editBranchData.latitude || ''} onChange={e => setEditBranchData({...editBranchData, latitude: parseFloat(e.target.value)})} />
+                          <input type="number" step="0.000001" className="bg-slate-900 border border-blue-500 rounded px-2 py-1.5 text-[10px] w-full font-mono outline-none" placeholder="Lng" value={editBranchData.longitude || ''} onChange={e => setEditBranchData({...editBranchData, longitude: parseFloat(e.target.value)})} />
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-mono">{b.latitude.toFixed(6)}, {b.longitude.toFixed(6)}</span>
+                      )}
+                    </td>
                     <td className="py-4 px-2 text-center">
-                       <button onClick={() => setBranches(branches.filter(x => x.id !== b.id))} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
+                      {editingBranchId === b.id ? (
+                        <input type="number" className="bg-slate-900 border border-blue-500 rounded px-2 py-1.5 text-xs w-20 text-center outline-none" value={editBranchData.radius || ''} onChange={e => setEditBranchData({...editBranchData, radius: parseInt(e.target.value)})} />
+                      ) : (
+                        <span className="text-blue-400 font-black text-xs">{b.radius}م</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-2 text-center">
+                      <div className="flex justify-center gap-2">
+                        {editingBranchId === b.id ? (
+                          <>
+                            <button onClick={() => saveEditBranch(b.id)} className="text-green-500 hover:bg-green-500/10 p-2 rounded-lg transition-all"><Check size={18}/></button>
+                            <button onClick={() => setEditingBranchId(null)} className="text-red-500 hover:bg-red-500/10 p-2 rounded-lg transition-all"><X size={18}/></button>
+                          </>
+                        ) : (
+                          <>
+                            <button onClick={() => { setEditingBranchId(b.id); setEditBranchData(b); }} className="text-blue-400 hover:bg-blue-400/10 p-2 rounded-lg transition-all"><Edit2 size={16}/></button>
+                            <button onClick={() => setBranches(branches.filter(x => x.id !== b.id))} className="text-slate-500 hover:text-red-400 hover:bg-red-400/10 p-2 rounded-lg transition-all"><Trash2 size={16}/></button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}</tbody>
@@ -295,12 +322,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     <tr key={acc.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-all">
                       <td className="py-4 px-2 font-bold text-sm">
                         {editingReportId === acc.id ? (
-                          <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.username} onChange={e => setEditReportData({...editReportData, username: e.target.value})} />
+                          <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.username || ''} onChange={e => setEditReportData({...editReportData, username: e.target.value})} />
                         ) : acc.username}
                       </td>
                       <td className="py-4 px-2 font-mono text-xs text-slate-400">
                         {editingReportId === acc.id ? (
-                           <input type="text" className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.password} onChange={e => setEditReportData({...editReportData, password: e.target.value})} />
+                           <input type="text" className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.password || ''} onChange={e => setEditReportData({...editReportData, password: e.target.value})} />
                         ) : (
                           <div className="flex items-center gap-2">
                             {showPass === acc.id ? acc.password : '••••••••'}
@@ -346,7 +373,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           ) : (
                             <>
                               <button onClick={() => { setEditingReportId(acc.id); setEditReportData(acc); }} className="text-blue-400 hover:bg-blue-900/20 p-1.5 rounded"><Edit2 size={16}/></button>
-                              {/* Fix: Using optional chaining for optional dispatch prop */}
                               <button onClick={() => setReportAccounts?.(reportAccounts.filter(x => x.id !== acc.id))} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
                             </>
                           )}
@@ -375,7 +401,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <thead><tr className="border-b border-slate-700 text-[10px] font-black text-slate-500 uppercase tracking-widest"><th className="py-4 px-2">الاسم</th><th className="py-4 px-2 text-center">الرقم القومي</th><th className="py-4 px-2">الوظيفة</th><th className="py-4 px-2 text-center">الحالة</th><th className="py-4 px-2 text-center">إجراءات</th></tr></thead>
                  <tbody>{allUsers.map(user => (
                    <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-all">
-                     <td className="py-4 px-2 font-bold">{editingUserId === user.id ? <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editUserData.fullName} onChange={e => setEditUserData({...editUserData, fullName: e.target.value})} /> : user.fullName}</td>
+                     <td className="py-4 px-2 font-bold">{editingUserId === user.id ? <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editUserData.fullName || ''} onChange={e => setEditUserData({...editUserData, fullName: e.target.value})} /> : user.fullName}</td>
                      <td className="py-4 px-2 text-slate-400 text-xs text-center font-mono">{user.nationalId}</td>
                      <td className="py-4 px-2 font-black text-blue-400 text-[10px]">{user.jobTitle}</td>
                      <td className="py-4 px-2 text-center">
