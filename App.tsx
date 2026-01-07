@@ -1,19 +1,23 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Branch, AttendanceRecord, AppConfig, Job } from './types';
+import { User, Branch, AttendanceRecord, AppConfig, Job, ReportAccount } from './types';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
-import { ShieldCheck, User as UserIcon, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import ReportsView from './components/ReportsView';
+import { ShieldCheck, User as UserIcon, Cloud, CloudOff, RefreshCw, FileSpreadsheet, Home } from 'lucide-react';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [reportAccounts, setReportAccounts] = useState<ReportAccount[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
+  const [activeView, setActiveView] = useState<'main' | 'reports'>('main');
+
   const [config, setConfig] = useState<AppConfig>(() => {
     const saved = localStorage.getItem('attendance_config');
     return saved ? JSON.parse(saved) : { 
@@ -36,18 +40,10 @@ const App: React.FC = () => {
       
       if (data.branches) setBranches(data.branches);
       if (data.jobs) setJobs(data.jobs);
+      if (data.reportAccounts) setReportAccounts(data.reportAccounts);
+      if (data.users && Array.isArray(data.users)) setAllUsers(data.users);
       
-      // قراءة بيانات الموظفين مباشرة من السحابة دون حفظها في المتصفح بشكل دائم
-      if (data.users && Array.isArray(data.users)) {
-        setAllUsers(data.users);
-      }
-      
-      const updatedConfig = { 
-        ...config, 
-        lastUpdated: new Date().toISOString(), 
-        syncUrl: url, 
-        googleSheetLink: url 
-      };
+      const updatedConfig = { ...config, lastUpdated: new Date().toISOString(), syncUrl: url, googleSheetLink: url };
       setConfig(updatedConfig);
       localStorage.setItem('attendance_config', JSON.stringify(updatedConfig));
     } catch (err) {
@@ -58,24 +54,18 @@ const App: React.FC = () => {
   }, [config]);
 
   useEffect(() => {
-    // استعادة حالة المستخدم فقط، أما قائمة الموظفين فتجلب من السحابة دائماً
     const savedUser = localStorage.getItem('attendance_current_user');
     const savedBranches = localStorage.getItem('attendance_branches');
     const savedJobs = localStorage.getItem('attendance_jobs');
-
     if (savedUser) setCurrentUser(JSON.parse(savedUser));
     if (savedBranches) setBranches(JSON.parse(savedBranches));
     if (savedJobs) setJobs(JSON.parse(savedJobs));
-    
-    // ملاحظة: تم إزالة استعادة records و allUsers من localStorage لضمان الخصوصية والمزامنة
   }, []);
 
   useEffect(() => {
     if (currentUser?.role === 'admin') return;
-
     const params = new URLSearchParams(window.location.search);
     const cloudUrlEncoded = params.get('c');
-    
     if (cloudUrlEncoded) {
       try {
         const decodedUrl = atob(cloudUrlEncoded);
@@ -89,7 +79,6 @@ const App: React.FC = () => {
     }
   }, [syncWithCloud, currentUser?.role, config.syncUrl]);
 
-  // حفظ الفروع والوظائف فقط محلياً للسرعة، أما بيانات الموظفين والسجلات فهي سحابية فقط
   useEffect(() => { localStorage.setItem('attendance_branches', JSON.stringify(branches)); }, [branches]);
   useEffect(() => { localStorage.setItem('attendance_jobs', JSON.stringify(jobs)); }, [jobs]);
 
@@ -101,10 +90,6 @@ const App: React.FC = () => {
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('attendance_current_user');
-  };
-
-  const handleRefresh = () => {
-    if (config.syncUrl) syncWithCloud(config.syncUrl, true);
   };
 
   return (
@@ -123,49 +108,62 @@ const App: React.FC = () => {
               {currentUser && <p className="text-[10px] text-gray-500 font-black">{currentUser.fullName}</p>}
             </div>
           </div>
-          {currentUser && <button onClick={handleLogout} className="px-4 py-2 text-xs font-black text-red-600 bg-red-50 rounded-xl">خروج</button>}
+          
+          <div className="flex items-center gap-2">
+             {!currentUser && (
+               <div className="flex bg-slate-100 p-1 rounded-xl">
+                 <button 
+                   onClick={() => setActiveView('main')} 
+                   className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center gap-1.5 ${activeView === 'main' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                 >
+                   <Home size={14} /> الرئيسية
+                 </button>
+                 <button 
+                   onClick={() => setActiveView('reports')} 
+                   className={`px-4 py-1.5 rounded-lg text-[10px] font-black transition-all flex items-center gap-1.5 ${activeView === 'reports' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}
+                 >
+                   <FileSpreadsheet size={14} /> Reports
+                 </button>
+               </div>
+             )}
+             {currentUser && <button onClick={handleLogout} className="px-4 py-2 text-xs font-black text-red-600 bg-red-50 rounded-xl">خروج</button>}
+          </div>
         </div>
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 pb-24">
-        {!currentUser ? (
-          <Login 
-            onLogin={handleLogin} 
-            allUsers={allUsers} 
-            adminConfig={config} 
-            availableJobs={jobs}
-            setAdminConfig={(newCfg) => {
-              const cfg = { ...config, ...newCfg };
-              setConfig(cfg);
-              localStorage.setItem('attendance_config', JSON.stringify(cfg));
-            }}
-          />
+        {activeView === 'reports' && !currentUser ? (
+          <ReportsView syncUrl={config.syncUrl} />
         ) : (
-          currentUser.role === 'admin' ? (
-            <AdminDashboard 
-              branches={branches} setBranches={setBranches}
-              jobs={jobs} setJobs={setJobs}
-              records={records} config={config} setConfig={setConfig}
-              allUsers={allUsers} setAllUsers={setAllUsers}
-              onRefresh={handleRefresh}
-              isSyncing={isSyncing}
+          !currentUser ? (
+            <Login 
+              onLogin={handleLogin} allUsers={allUsers} adminConfig={config} availableJobs={jobs}
+              setAdminConfig={(newCfg) => {
+                const cfg = { ...config, ...newCfg };
+                setConfig(cfg);
+                localStorage.setItem('attendance_config', JSON.stringify(cfg));
+              }}
             />
           ) : (
-            <UserDashboard 
-              user={currentUser} 
-              branches={branches} 
-              records={records} 
-              setRecords={setRecords}
-              googleSheetLink={config.googleSheetLink}
-              onRefresh={handleRefresh}
-              isSyncing={isSyncing}
-              lastUpdated={config.lastUpdated}
-            />
+            currentUser.role === 'admin' ? (
+              <AdminDashboard 
+                branches={branches} setBranches={setBranches} jobs={jobs} setJobs={setJobs}
+                records={records} config={config} setConfig={setConfig} allUsers={allUsers} setAllUsers={setAllUsers}
+                reportAccounts={reportAccounts} setReportAccounts={setReportAccounts}
+                onRefresh={() => syncWithCloud(config.syncUrl)} isSyncing={isSyncing}
+              />
+            ) : (
+              <UserDashboard 
+                user={currentUser} branches={branches} records={records} setRecords={setRecords}
+                googleSheetLink={config.googleSheetLink} onRefresh={() => syncWithCloud(config.syncUrl)}
+                isSyncing={isSyncing} lastUpdated={config.lastUpdated}
+              />
+            )
           )
         )}
       </main>
-      <footer className="py-4 text-center text-gray-400 text-[10px] font-bold border-t">
-        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| بيانات مباشرة من السحابة | آخر تحديث: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
+      <footer className="py-4 text-center text-gray-400 text-[10px] font-bold border-t uppercase tracking-widest">
+        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| Cloud Sync Active | Last Update: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
       </footer>
     </div>
   );
