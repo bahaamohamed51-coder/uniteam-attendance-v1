@@ -24,7 +24,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   branches, setBranches, jobs, setJobs, records, config, setConfig, allUsers, setAllUsers, 
   reportAccounts = [], setReportAccounts, onRefresh, isSyncing
 }) => {
-  const [activeTab, setActiveTab] = useState<'branches' | 'jobs' | 'reports' | 'users' | 'report-access' | 'settings'>('branches');
+  const [activeTab, setActiveTab] = useState<'branches' | 'jobs' | 'users' | 'report-access' | 'settings'>('branches');
   const [newBranch, setNewBranch] = useState<Partial<Branch>>({ name: '', latitude: 0, longitude: 0, radius: 100 });
   const [newJobTitle, setNewJobTitle] = useState('');
   const [isPushing, setIsPushing] = useState(false);
@@ -189,7 +189,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           { id: 'jobs', label: 'الوظائف', icon: Briefcase },
           { id: 'users', label: 'الموظفين', icon: Users },
           { id: 'report-access', label: 'صلاحيات التقارير', icon: Key },
-          { id: 'reports', label: 'السجل العام', icon: Table },
           { id: 'settings', label: 'الإعدادات', icon: Shield }
         ].map(tab => (
           <button
@@ -419,14 +418,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                ))}
             </div>
           </div>
-        )}
-
-        {activeTab === 'reports' && (
-           <div className="flex flex-col items-center justify-center py-24 text-slate-500 space-y-4">
-              <Table size={48} className="opacity-20 text-blue-400" />
-              <p className="font-black text-slate-300">التقارير مسجلة لحظياً في السحابة</p>
-              <button onClick={() => config.googleSheetLink && window.open(config.googleSheetLink, '_blank')} className="px-6 py-3 bg-slate-900 border border-slate-700 rounded-2xl text-xs font-black text-slate-400 hover:text-white transition-all shadow-lg flex items-center gap-2">فتح ملف جوجل شيت <Share2 size={14} /></button>
-           </div>
         )}
 
         {activeTab === 'settings' && (
