@@ -22,7 +22,7 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   branches, setBranches, jobs, setJobs, records, config, setConfig, allUsers, setAllUsers, 
-  reportAccounts = [], setReportAccounts = () => {}, onRefresh, isSyncing
+  reportAccounts = [], setReportAccounts, onRefresh, isSyncing
 }) => {
   const [activeTab, setActiveTab] = useState<'branches' | 'jobs' | 'reports' | 'users' | 'report-access' | 'settings'>('branches');
   const [newBranch, setNewBranch] = useState<Partial<Branch>>({ name: '', latitude: 0, longitude: 0, radius: 100 });
@@ -34,6 +34,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [newRepPass, setNewRepPass] = useState('');
   const [selectedJobsForAcc, setSelectedJobsForAcc] = useState<string[]>([]);
   const [showPass, setShowPass] = useState<string | null>(null);
+
+  // تعديل حسابات التقارير
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [editReportData, setEditReportData] = useState<Partial<ReportAccount>>({});
 
   const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
   const [editBranchData, setEditBranchData] = useState<Partial<Branch>>({});
@@ -76,6 +80,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const wb = XLSX.read(bstr, { type: 'binary' });
         const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         if (type === 'branches') {
+          // Fixed potential inference error by ensuring Dispatch type is correctly used
           setBranches(prev => [...prev, ...data.map((item: any) => ({
             id: Math.random().toString(36).substr(2, 9),
             name: item["اسم الفرع"] || 'فرع جديد',
@@ -84,6 +89,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             radius: parseInt(item["النطاق بالمتر"] || 100)
           }))]);
         } else {
+          // Fixed potential inference error by ensuring Dispatch type is correctly used
           setJobs(prev => [...prev, ...data.map((item: any) => ({
             id: Math.random().toString(36).substr(2, 9),
             title: item["اسم الوظيفة"] || 'موظف'
@@ -135,8 +141,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       password: newRepPass,
       allowedJobs: selectedJobsForAcc
     };
-    setReportAccounts([...reportAccounts, newAcc]);
+    // Fix: Using optional chaining for optional dispatch prop
+    setReportAccounts?.([...reportAccounts, newAcc]);
     setNewRepUser(''); setNewRepPass(''); setSelectedJobsForAcc([]);
+  };
+
+  const saveEditReportAcc = (id: string) => {
+    if (!editReportData.username || !editReportData.password || !editReportData.allowedJobs || editReportData.allowedJobs.length === 0) {
+      alert("يرجى التأكد من اسم المستخدم وكلمة المرور واختيار وظيفة واحدة على الأقل");
+      return;
+    }
+    // Fix: Using optional chaining for optional dispatch prop and type safety
+    setReportAccounts?.(prev => prev.map(acc => acc.id === id ? { ...acc, ...editReportData } as ReportAccount : acc));
+    setEditingReportId(null);
   };
 
   const inputClasses = "px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-white font-bold outline-none focus:border-blue-500 w-full transition-all";
@@ -277,22 +294,64 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <tbody>
                   {reportAccounts.map(acc => (
                     <tr key={acc.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-all">
-                      <td className="py-4 px-2 font-bold text-sm">{acc.username}</td>
+                      <td className="py-4 px-2 font-bold text-sm">
+                        {editingReportId === acc.id ? (
+                          <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.username} onChange={e => setEditReportData({...editReportData, username: e.target.value})} />
+                        ) : acc.username}
+                      </td>
                       <td className="py-4 px-2 font-mono text-xs text-slate-400">
-                        <div className="flex items-center gap-2">
-                          {showPass === acc.id ? acc.password : '••••••••'}
-                          <button onClick={() => setShowPass(showPass === acc.id ? null : acc.id)} className="text-slate-600 hover:text-blue-400">
-                            {showPass === acc.id ? <EyeOff size={14}/> : <Eye size={14}/>}
-                          </button>
-                        </div>
+                        {editingReportId === acc.id ? (
+                           <input type="text" className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editReportData.password} onChange={e => setEditReportData({...editReportData, password: e.target.value})} />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            {showPass === acc.id ? acc.password : '••••••••'}
+                            <button onClick={() => setShowPass(showPass === acc.id ? null : acc.id)} className="text-slate-600 hover:text-blue-400">
+                              {showPass === acc.id ? <EyeOff size={14}/> : <Eye size={14}/>}
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="py-4 px-2">
-                         <div className="flex flex-wrap gap-1">
-                           {acc.allowedJobs.map((j, i) => <span key={i} className="px-2 py-0.5 bg-blue-900/30 text-blue-400 text-[9px] font-black rounded border border-blue-800/30">{j}</span>)}
-                         </div>
+                         {editingReportId === acc.id ? (
+                           <div className="flex flex-wrap gap-1 max-w-[200px]">
+                              {jobs.map(j => (
+                                <button 
+                                  key={j.id} 
+                                  onClick={() => {
+                                    const current = editReportData.allowedJobs || [];
+                                    if (current.includes(j.title)) {
+                                      setEditReportData({...editReportData, allowedJobs: current.filter(t => t !== j.title)});
+                                    } else {
+                                      setEditReportData({...editReportData, allowedJobs: [...current, j.title]});
+                                    }
+                                  }}
+                                  className={`px-1.5 py-0.5 rounded text-[8px] font-black border ${editReportData.allowedJobs?.includes(j.title) ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-400'}`}
+                                >
+                                  {j.title}
+                                </button>
+                              ))}
+                           </div>
+                         ) : (
+                           <div className="flex flex-wrap gap-1">
+                             {acc.allowedJobs.map((j, i) => <span key={i} className="px-2 py-0.5 bg-blue-900/30 text-blue-400 text-[9px] font-black rounded border border-blue-800/30">{j}</span>)}
+                           </div>
+                         )}
                       </td>
                       <td className="py-4 px-2 text-center">
-                        <button onClick={() => setReportAccounts(reportAccounts.filter(x => x.id !== acc.id))} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
+                        <div className="flex justify-center gap-2">
+                          {editingReportId === acc.id ? (
+                            <>
+                              <button onClick={() => saveEditReportAcc(acc.id)} className="text-green-500"><Check size={18}/></button>
+                              <button onClick={() => setEditingReportId(null)} className="text-red-500"><X size={18}/></button>
+                            </>
+                          ) : (
+                            <>
+                              <button onClick={() => { setEditingReportId(acc.id); setEditReportData(acc); }} className="text-blue-400 hover:bg-blue-900/20 p-1.5 rounded"><Edit2 size={16}/></button>
+                              {/* Fix: Using optional chaining for optional dispatch prop */}
+                              <button onClick={() => setReportAccounts?.(reportAccounts.filter(x => x.id !== acc.id))} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
