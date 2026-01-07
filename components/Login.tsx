@@ -115,7 +115,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       // 1. التحقق: هل هذا الهاتف (الذي يحاول الدخول الآن) يخص موظفاً آخر؟
       const otherDeviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
       if (otherDeviceOwner) {
-        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر (${otherDeviceOwner.fullName}). لا يسمح بفتح حسابين من جهاز واحد.`);
+        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر . لا يسمح بفتح حسابين من جهاز واحد.`);
         return;
       }
 
