@@ -50,24 +50,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       setError('كلمة المرور يجب ألا تقل عن 6 أرقام/حروف');
       return;
     }
-    if (/^0+$/.test(password)) {
-      setError('لا يمكن أن تتكون كلمة المرور من أصفار فقط');
-      return;
-    }
     
     const deviceId = getDeviceFingerprint();
 
-    // التأكد من أن الرقم القومي غير مسجل مسبقاً
+    // 1. التأكد من أن الرقم القومي غير مسجل مسبقاً
     const existingById = allUsers.find(u => u.nationalId === nationalId);
     if (existingById) {
       setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام. يرجى تسجيل الدخول.');
       return;
     }
 
-    // منع التسجيل إذا كان الهاتف مرتبطاً بموظف آخر
-    const existingByDevice = allUsers.find(u => u.deviceId === deviceId);
-    if (existingByDevice) {
-      setError(`عذراً، هذا الهاتف مسجل عليه موظف آخر بالفعل (${existingByDevice.fullName}). يمنع تعدد الحسابات على نفس الجهاز.`);
+    // 2. منع التسجيل إذا كان هذا الجهاز (Fingerprint) مرتبطاً بموظف آخر بالفعل
+    const deviceOwner = allUsers.find(u => u.deviceId === deviceId);
+    if (deviceOwner) {
+      setError(`عذراً، هذا الهاتف مرتبط بالفعل بحساب موظف آخر (${deviceOwner.fullName}). يمنع النظام تكرار الحسابات على نفس الجهاز.`);
       return;
     }
 
@@ -84,7 +80,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
     if (adminConfig.googleSheetLink) {
       try {
-        await fetch(adminConfig.googleSheetLink, {
+        const response = await fetch(adminConfig.googleSheetLink, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
@@ -107,7 +103,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     e.preventDefault();
     
     if (allUsers.length === 0 && adminConfig.syncUrl) {
-       setError('جاري جلب بيانات الموظفين من السحابة، يرجى الانتظار ثانية واحدة...');
+       setError('جاري جلب البيانات، يرجى الانتظار ثوانٍ...');
        return;
     }
 
@@ -116,19 +112,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
       
-      // تحقق إضافي: هل هذا الهاتف مسجل لموظف آخر؟ (لمنع تبديل الحسابات على نفس الجهاز)
-      const deviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
-      if (deviceOwner) {
-        setError(`عذراً، هذا الهاتف مسجل عليه موظف آخر (${deviceOwner.fullName}). لا يسمح بفتح أكثر من حساب على نفس الجهاز.`);
+      // 1. التحقق: هل هذا الهاتف (الذي يحاول الدخول الآن) يخص موظفاً آخر؟
+      const otherDeviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
+      if (otherDeviceOwner) {
+        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر (${otherDeviceOwner.fullName}). لا يسمح بفتح حسابين من جهاز واحد.`);
         return;
       }
 
-      // إذا كان الموظف مسجل ولكن تم حذف ربط الجهاز الخاص به من قبل المسؤول
+      // 2. إذا كان حساب الموظف غير مربوط بجهاز حالياً (تم مسح الـ Device ID من قبل الأدمن)
       if (!user.deviceId || user.deviceId === "") {
-        // ربط الجهاز الجديد تلقائياً
+        // نربطه بالجهاز الحالي بشرط ألا يكون الجهاز "محجوزاً" لموظف آخر (تم التحقق في الخطوة السابقة)
         user.deviceId = currentDeviceId;
         
-        // إرسال تحديث للسحابة ليتم حفظ الهاتف الجديد فوراً
         if (adminConfig.googleSheetLink) {
           try {
             await fetch(adminConfig.googleSheetLink, {
@@ -141,13 +136,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
                 deviceId: currentDeviceId
               })
             });
-            console.log("New device linked successfully");
           } catch (err) {
-            console.error("Failed to save new device link to cloud", err);
+            console.error("Sync device update failed", err);
           }
         }
-      } else if (user.deviceId !== currentDeviceId) {
-        setError('عذراً، هذا الحساب مربوط بهاتف آخر. يرجى مراجعة المسؤول لفك الارتباط القديم.');
+      } 
+      // 3. إذا كان الحساب مربوطاً بجهاز بالفعل، يجب أن يكون هو نفس الجهاز الحالي
+      else if (user.deviceId !== currentDeviceId) {
+        setError('عذراً، هذا الحساب مربوط بهاتف آخر. يرجى مراجعة المسؤول لفك الارتباط القديم إذا قمت بتغيير هاتفك.');
         return;
       }
       
@@ -193,14 +189,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             </div>
           ) : mode !== 'admin' && (
             <div className="mb-8 p-4 bg-orange-900/20 border-r-4 border-orange-500 rounded-xl">
-              <p className="text-orange-400 text-xs font-bold leading-relaxed">
+              <p className="text-orange-400 text-xs font-bold leading-relaxed text-right">
                 التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" من المسؤول للبدء.
               </p>
             </div>
           )}
 
           {error && (
-            <div className="mb-6 p-4 bg-red-900/20 border-r-4 border-red-500 text-red-400 text-xs font-bold flex gap-2 items-start">
+            <div className="mb-6 p-4 bg-red-900/20 border-r-4 border-red-500 text-red-400 text-xs font-bold flex gap-2 items-start text-right">
               <AlertCircle size={16} className="shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
@@ -209,7 +205,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
           {mode === 'connect' && (
             <form onSubmit={handleConnect} className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] text-slate-500 font-black mr-2 uppercase">رابط الشركة (Sync URL)</label>
+                <label className="text-[10px] text-slate-500 font-black mr-2 uppercase tracking-widest">رابط الشركة (Sync URL)</label>
                 <input type="text" placeholder="https://script.google.com/..." value={syncUrlInput} onChange={e => setSyncUrlInput(e.target.value)} className={inputClasses} />
               </div>
               <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
@@ -223,7 +219,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="flex items-center gap-2 mb-2 p-3 bg-blue-900/20 rounded-xl border border-blue-800/50">
                 <Smartphone size={16} className="text-blue-400" />
-                <span className="text-[9px] text-blue-300 font-bold">سيتم ربط حسابك بهذا الهاتف تلقائياً ولن يعمل على غيره</span>
+                <span className="text-[9px] text-blue-300 font-bold">قيد أمان: سيتم قفل حسابك على هذا الهاتف فقط.</span>
               </div>
               <input type="text" placeholder="الاسم الرباعي" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClasses} />
               <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} className={inputClasses} />
@@ -238,10 +234,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
                 </select>
                 <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
-              <input type="password" placeholder="تعيين كلمة مرور (6 أرقام على الأقل)" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
+              <input type="password" placeholder="تعيين كلمة مرور" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
-                {isLoading ? 'جاري التحقق...' : 'تسجيل وربط الجهاز'}
+                {isLoading ? 'جاري الحفظ...' : 'تسجيل وتأمين الهاتف'}
               </button>
             </form>
           )}
@@ -250,7 +246,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             <form onSubmit={handleEmployeeLogin} className="space-y-4">
               <input 
                 type="text" 
-                placeholder="الرقم القومي (14 رقم)" 
+                placeholder="الرقم القومي" 
                 maxLength={14} 
                 value={nationalId} 
                 onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} 
@@ -270,11 +266,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <button type="submit" className="w-full bg-slate-700 hover:bg-slate-600 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all border border-slate-500">
                 <ShieldAlert size={20} /> دخول لوحة التحكم
               </button>
-              {adminConfig.syncUrl ? (
-                 <button type="button" onClick={() => setMode('login')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للدخول</button>
-              ) : (
-                 <button type="button" onClick={() => setMode('connect')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة للربط</button>
-              )}
+              <button type="button" onClick={() => setMode(adminConfig.syncUrl ? 'login' : 'connect')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة</button>
             </form>
           )}
         </div>
