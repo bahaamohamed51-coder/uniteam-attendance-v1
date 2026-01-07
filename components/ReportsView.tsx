@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X } from 'lucide-react';
+import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X, Link as LinkIcon, AlertCircle } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsViewProps {
@@ -22,7 +22,6 @@ const CustomDatePicker: React.FC<{
 
   const handleDateClick = (day: number) => {
     const selected = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
-    // تصحيح التوقيت للمنطقة الزمنية
     const offset = selected.getTimezoneOffset();
     const adjustedDate = new Date(selected.getTime() - (offset * 60 * 1000));
     onChange(adjustedDate.toISOString().split('T')[0]);
@@ -36,7 +35,7 @@ const CustomDatePicker: React.FC<{
   const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
   
   return (
-    <div className="relative space-y-1 w-full">
+    <div className="relative space-y-1 w-full text-right">
       <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">{label}</label>
       <button 
         onClick={() => setIsOpen(!isOpen)}
@@ -83,7 +82,8 @@ const CustomDatePicker: React.FC<{
   );
 };
 
-const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
+const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) => {
+  const [localSyncUrl, setLocalSyncUrl] = useState(initialSyncUrl || localStorage.getItem('attendance_temp_sync_url') || '');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -97,25 +97,37 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   const [toDate, setToDate] = useState('');
   const [selectedJob, setSelectedJob] = useState('');
 
+  const activeSyncUrl = localSyncUrl || initialSyncUrl;
+
   const fetchData = async (showLoading = true) => {
-    if (!username || !password) return;
+    if (!activeSyncUrl) {
+      setError('يرجى إدخال رابط المزامنة الخاص بالشركة أولاً');
+      return;
+    }
+    if (!username || !password) {
+      setError('يرجى إدخال اسم المستخدم وكلمة المرور');
+      return;
+    }
+    
     if (showLoading) setIsLoading(true);
     else setIsRefreshing(true);
     
     setError('');
     try {
-      const response = await fetch(`${syncUrl}?action=getReportData&user=${encodeURIComponent(username)}&pass=${encodeURIComponent(password)}`);
+      const response = await fetch(`${activeSyncUrl}?action=getReportData&user=${encodeURIComponent(username)}&pass=${encodeURIComponent(password)}`);
       const data = await response.json();
       
       if (data.error) {
-        setError('بيانات الدخول غير صحيحة أو ليس لديك صلاحيات');
+        setError('بيانات الدخول غير صحيحة أو ليس لديك صلاحيات لهذه الوظائف');
         if (showLoading) setIsLoggedIn(false);
       } else {
         setRecords(data);
         setIsLoggedIn(true);
+        // حفظ الرابط للاستخدام اللاحق إذا كان صحيحاً
+        localStorage.setItem('attendance_temp_sync_url', activeSyncUrl);
       }
     } catch (err) {
-      setError('حدث خطأ أثناء الاتصال بالسحابة');
+      setError('حدث خطأ أثناء الاتصال بالسحابة. تأكد من صحة رابط المزامنة.');
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -131,7 +143,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     fetchData(false);
   };
 
-  // استخراج الوظائف الفريدة من السجلات المتاحة
   const availableJobs = useMemo(() => {
     const jobs = records.map(r => r.job);
     return Array.from(new Set(jobs)).filter(Boolean) as string[];
@@ -177,22 +188,37 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
-    XLSX.writeFile(wb, `Report_${username}_${selectedJob ? selectedJob + '_' : ''}${new Date().toLocaleDateString()}.xlsx`);
+    XLSX.writeFile(wb, `Report_${username}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (!isLoggedIn) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-12 px-4">
         <div className="bg-slate-800 rounded-3xl p-8 w-full max-w-md border border-slate-700 shadow-2xl">
           <div className="text-center mb-8">
             <div className="bg-blue-600 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-900/20">
               <FileSpreadsheet size={32} className="text-white" />
             </div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">تقارير الوظائف</h2>
-            <p className="text-slate-500 text-[10px] font-black uppercase mt-1">سجل الدخول لاستعراض البيانات</p>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter">Reports Access</h2>
+            <p className="text-slate-500 text-[10px] font-black uppercase mt-1">نظام متابعة التقارير والوظائف</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
+            {!initialSyncUrl && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-widest flex items-center gap-1">
+                  <LinkIcon size={12} /> رابط المزامنة (Sync URL)
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="https://script.google.com/..."
+                  className="w-full bg-slate-900 border border-slate-700 text-white px-5 py-3.5 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-xs"
+                  value={localSyncUrl}
+                  onChange={e => setLocalSyncUrl(e.target.value)}
+                />
+              </div>
+            )}
+            
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-widest">اسم المستخدم</label>
               <input 
@@ -202,6 +228,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
                 onChange={e => setUsername(e.target.value)}
               />
             </div>
+            
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-widest">كلمة المرور</label>
               <input 
@@ -211,14 +238,21 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
                 onChange={e => setPassword(e.target.value)}
               />
             </div>
-            {error && <p className="text-red-400 text-[10px] font-bold text-center px-2">{error}</p>}
+            
+            {error && (
+              <div className="p-3 bg-red-900/20 border border-red-500/50 rounded-xl text-red-400 text-[10px] font-bold flex gap-2 items-center">
+                <AlertCircle size={16} />
+                <span>{error}</span>
+              </div>
+            )}
+            
             <button 
               disabled={isLoading}
               type="submit" 
               className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-2xl font-black shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               {isLoading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
-              دخول النظام
+              دخول واستعراض التقارير
             </button>
           </form>
         </div>
@@ -229,13 +263,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
-        <div className="text-white">
+        <div className="text-right w-full md:w-auto">
           <h2 className="text-xl font-black text-blue-400 flex items-center gap-2">
-            <Table size={24} /> تقرير بيانات الموظفين
+            <Table size={24} /> متابعة التقارير والوظائف
           </h2>
-          <p className="text-slate-500 text-[10px] font-black uppercase">مرحباً {username}</p>
+          <p className="text-slate-500 text-[10px] font-black uppercase">المسؤول: {username}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 justify-center">
           <button 
             onClick={handleRefresh}
             disabled={isRefreshing}
@@ -258,32 +292,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
         </div>
       </div>
 
-      {/* شريط الفلاتر */}
       <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg space-y-4">
-        <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
-           <Filter size={14} /> تصفية السجل المتقدمة
+        <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest text-right">
+           <Filter size={14} /> تصفية السجلات قبل التحميل
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          <CustomDatePicker 
-            label="من تاريخ" 
-            value={fromDate} 
-            onChange={setFromDate} 
-            placeholder="اختر البداية" 
-          />
-          
-          <CustomDatePicker 
-            label="إلى تاريخ" 
-            value={toDate} 
-            onChange={setToDate} 
-            placeholder="اختر النهاية" 
-          />
+          <CustomDatePicker label="من تاريخ" value={fromDate} onChange={setFromDate} placeholder="اختر البداية" />
+          <CustomDatePicker label="إلى تاريخ" value={toDate} onChange={setToDate} placeholder="اختر النهاية" />
 
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">الوظيفة</label>
+          <div className="space-y-1 text-right">
+            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">تصفية بالوظيفة</label>
             <div className="relative">
               <select 
-                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none cursor-pointer"
+                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none cursor-pointer text-right"
                 value={selectedJob}
                 onChange={e => setSelectedJob(e.target.value)}
               >
@@ -305,8 +326,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
           </div>
         </div>
       </div>
-      
-      {/* تم إزالة جدول عرض البيانات بناءً على طلب المستخدم لإظهار الفلاتر فقط */}
+
+      <div className="p-10 text-center bg-slate-900/30 rounded-3xl border border-dashed border-slate-700">
+        <p className="text-slate-500 text-xs font-black uppercase tracking-widest">
+          تم إخفاء عرض الجدول المباشر. يمكنك استخدام الفلاتر أعلاه ثم الضغط على "تحميل Excel" لاستخراج التقارير.
+        </p>
+        <div className="mt-4 text-[10px] text-blue-500 font-bold uppercase">
+          عدد السجلات المفلترة حالياً: {filteredRecords.length}
+        </div>
+      </div>
     </div>
   );
 };
