@@ -57,15 +57,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     
     const deviceId = getDeviceFingerprint();
 
+    // التأكد من أن الرقم القومي غير مسجل مسبقاً
     const existingById = allUsers.find(u => u.nationalId === nationalId);
     if (existingById) {
       setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام. يرجى تسجيل الدخول.');
       return;
     }
 
+    // منع التسجيل إذا كان الهاتف مرتبطاً بموظف آخر
     const existingByDevice = allUsers.find(u => u.deviceId === deviceId);
     if (existingByDevice) {
-      setError('عذراً، هذا الهاتف مسجل عليه موظف آخر بالفعل (تعدد الحسابات مرفوض).');
+      setError(`عذراً، هذا الهاتف مسجل عليه موظف آخر بالفعل (${existingByDevice.fullName}). يمنع تعدد الحسابات على نفس الجهاز.`);
       return;
     }
 
@@ -114,6 +116,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
       
+      // تحقق إضافي: هل هذا الهاتف مسجل لموظف آخر؟ (لمنع تبديل الحسابات على نفس الجهاز)
+      const deviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
+      if (deviceOwner) {
+        setError(`عذراً، هذا الهاتف مسجل عليه موظف آخر (${deviceOwner.fullName}). لا يسمح بفتح أكثر من حساب على نفس الجهاز.`);
+        return;
+      }
+
       // إذا كان الموظف مسجل ولكن تم حذف ربط الجهاز الخاص به من قبل المسؤول
       if (!user.deviceId || user.deviceId === "") {
         // ربط الجهاز الجديد تلقائياً
