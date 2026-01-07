@@ -23,6 +23,13 @@ export interface User {
   jobTitle?: string;
 }
 
+export interface ReportAccount {
+  id: string;
+  username: string;
+  password?: string;
+  allowedJobs: string[]; // قائمة عناوين الوظائف المسموح بها
+}
+
 export interface AttendanceRecord {
   id: string;
   userId: string;
