@@ -15,9 +15,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   const [records, setRecords] = useState<any[]>([]);
   const [error, setError] = useState('');
 
-  // فلاتر التاريخ
+  // فلاتر التاريخ والوظيفة
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  const [selectedJob, setSelectedJob] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +43,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     }
   };
 
+  // استخراج الوظائف الفريدة من السجلات المتاحة
+  const availableJobs = useMemo(() => {
+    const jobs = records.map(r => r.job);
+    return Array.from(new Set(jobs)).filter(Boolean) as string[];
+  }, [records]);
+
   const filteredRecords = useMemo(() => {
-    if (!fromDate && !toDate) return records;
+    if (!fromDate && !toDate && !selectedJob) return records;
     
     return records.filter(r => {
       const recordDate = new Date(r.date);
@@ -61,9 +68,12 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
         t.setHours(0, 0, 0, 0);
         match = match && recordDate <= t;
       }
+      if (selectedJob) {
+        match = match && r.job === selectedJob;
+      }
       return match;
     });
-  }, [records, fromDate, toDate]);
+  }, [records, fromDate, toDate, selectedJob]);
 
   const exportToExcel = () => {
     const dataToExport = filteredRecords.map(r => ({
@@ -80,7 +90,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Attendance Report");
-    XLSX.writeFile(wb, `Report_${username}_${new Date().toLocaleDateString()}.xlsx`);
+    XLSX.writeFile(wb, `Report_${username}_${selectedJob ? selectedJob + '_' : ''}${new Date().toLocaleDateString()}.xlsx`);
   };
 
   if (!isLoggedIn) {
@@ -157,9 +167,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
       {/* شريط الفلاتر */}
       <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg space-y-4">
         <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
-           <Filter size={14} /> تصفية السجل حسب التاريخ
+           <Filter size={14} /> تصفية السجل
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1">
             <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">من تاريخ</label>
             <input 
@@ -178,10 +188,23 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
               onChange={e => setToDate(e.target.value)}
             />
           </div>
+          <div className="space-y-1">
+            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">الوظيفة</label>
+            <select 
+              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none"
+              value={selectedJob}
+              onChange={e => setSelectedJob(e.target.value)}
+            >
+              <option value="">كل الوظائف المتاحة</option>
+              {availableJobs.map(job => (
+                <option key={job} value={job}>{job}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-end">
              <button 
-               onClick={() => { setFromDate(''); setToDate(''); }}
-               className="w-full md:w-auto px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all"
+               onClick={() => { setFromDate(''); setToDate(''); setSelectedJob(''); }}
+               className="w-full px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all"
              >
                إعادة تعيين الفلتر
              </button>
