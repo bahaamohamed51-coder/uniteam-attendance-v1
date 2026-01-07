@@ -91,17 +91,19 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
   const [error, setError] = useState('');
+  const [showUrlField, setShowUrlField] = useState(!initialSyncUrl);
 
   // فلاتر التاريخ والوظيفة
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  const [selectedJobs, setSelectedJobs] = useState<string[]>([]); // تغيير إلى مصفوفة لاختيار متعدد
+  const [selectedJobs, setSelectedJobs] = useState<string[]>([]); // مصفوفة لاختيار متعدد
 
   const activeSyncUrl = localSyncUrl || initialSyncUrl;
 
   const fetchData = async (showLoading = true) => {
     if (!activeSyncUrl) {
       setError('يرجى إدخال رابط المزامنة الخاص بالشركة أولاً');
+      setShowUrlField(true);
       return;
     }
     if (!username || !password) {
@@ -125,9 +127,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
         setIsLoggedIn(true);
         // حفظ الرابط للاستخدام اللاحق إذا كان صحيحاً
         localStorage.setItem('attendance_temp_sync_url', activeSyncUrl);
+        setShowUrlField(false);
       }
     } catch (err) {
       setError('حدث خطأ أثناء الاتصال بالسحابة. تأكد من صحة رابط المزامنة.');
+      setShowUrlField(true); // إظهار حقل الرابط عند حدوث خطأ في الاتصال
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -210,8 +214,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {!initialSyncUrl && (
-              <div className="space-y-2">
+            {showUrlField && (
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-widest flex items-center gap-1">
                   <LinkIcon size={12} /> رابط المزامنة (Sync URL)
                 </label>
@@ -222,6 +226,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
                   value={localSyncUrl}
                   onChange={e => setLocalSyncUrl(e.target.value)}
                 />
+                {initialSyncUrl && (
+                  <button 
+                    type="button"
+                    onClick={() => setShowUrlField(false)}
+                    className="text-[9px] text-slate-500 hover:text-blue-400 font-bold mr-2 uppercase transition-colors"
+                  >
+                    إلغاء التعديل
+                  </button>
+                )}
               </div>
             )}
             
@@ -260,6 +273,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
               {isLoading ? <Loader2 className="animate-spin" size={20} /> : <LogIn size={20} />}
               دخول واستعراض التقارير
             </button>
+            
+            {!showUrlField && initialSyncUrl && (
+               <button 
+                 type="button" 
+                 onClick={() => setShowUrlField(true)}
+                 className="w-full text-slate-500 text-[10px] font-black py-2 uppercase hover:text-slate-300 transition-colors"
+               >
+                 تغيير رابط الشركة
+               </button>
+            )}
           </form>
         </div>
       </div>
