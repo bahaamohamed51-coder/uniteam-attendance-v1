@@ -1,17 +1,94 @@
 
-import React, { useState, useMemo } from 'react';
-import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar, MapPin, User as UserIcon, Briefcase, Filter } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface ReportsViewProps {
   syncUrl: string;
 }
 
+// مكون التقويم المدمج
+const CustomDatePicker: React.FC<{ 
+  label: string, 
+  value: string, 
+  onChange: (val: string) => void,
+  placeholder: string
+}> = ({ label, value, onChange, placeholder }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
+
+  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const handleDateClick = (day: number) => {
+    const selected = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+    // تصحيح التوقيت للمنطقة الزمنية
+    const offset = selected.getTimezoneOffset();
+    const adjustedDate = new Date(selected.getTime() - (offset * 60 * 1000));
+    onChange(adjustedDate.toISOString().split('T')[0]);
+    setIsOpen(false);
+  };
+
+  const changeMonth = (offset: number) => {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
+  };
+
+  const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  
+  return (
+    <div className="relative space-y-1 w-full">
+      <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">{label}</label>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold text-right flex justify-between items-center hover:border-blue-500 transition-all"
+      >
+        <span>{value || placeholder}</span>
+        <CalendarIcon size={14} className="text-slate-500" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-2 p-4 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-64 right-0">
+          <div className="flex justify-between items-center mb-4">
+            <button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronRight size={18} /></button>
+            <span className="text-xs font-black text-blue-400">{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span>
+            <button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronLeft size={18} /></button>
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center mb-2">
+            {["ح", "ن", "ث", "ر", "خ", "ج", "س"].map(d => (
+              <span key={d} className="text-[10px] text-slate-500 font-bold">{d}</span>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {Array.from({ length: firstDayOfMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => (
+              <div key={`empty-${i}`} />
+            ))}
+            {Array.from({ length: daysInMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => {
+              const day = i + 1;
+              const isSelected = value === new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0];
+              return (
+                <button 
+                  key={day}
+                  onClick={() => handleDateClick(day)}
+                  className={`py-1.5 text-[10px] font-bold rounded-lg transition-all ${isSelected ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-700'}`}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={() => setIsOpen(false)} className="w-full mt-4 py-1 text-[9px] text-slate-500 hover:text-white font-black uppercase tracking-widest border-t border-slate-700 pt-2">إغلاق</button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
   const [error, setError] = useState('');
 
@@ -20,11 +97,11 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
   const [toDate, setToDate] = useState('');
   const [selectedJob, setSelectedJob] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchData = async (showLoading = true) => {
     if (!username || !password) return;
+    if (showLoading) setIsLoading(true);
+    else setIsRefreshing(true);
     
-    setIsLoading(true);
     setError('');
     try {
       const response = await fetch(`${syncUrl}?action=getReportData&user=${encodeURIComponent(username)}&pass=${encodeURIComponent(password)}`);
@@ -32,6 +109,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
       
       if (data.error) {
         setError('بيانات الدخول غير صحيحة أو ليس لديك صلاحيات');
+        if (showLoading) setIsLoggedIn(false);
       } else {
         setRecords(data);
         setIsLoggedIn(true);
@@ -40,7 +118,17 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
       setError('حدث خطأ أثناء الاتصال بالسحابة');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchData(true);
+  };
+
+  const handleRefresh = () => {
+    fetchData(false);
   };
 
   // استخراج الوظائف الفريدة من السجلات المتاحة
@@ -54,7 +142,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
     
     return records.filter(r => {
       const recordDate = new Date(r.date);
-      // ضبط الوقت للصفر للمقارنة باليوم فقط
       recordDate.setHours(0, 0, 0, 0);
       
       let match = true;
@@ -148,18 +235,25 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
           </h2>
           <p className="text-slate-500 text-[10px] font-black uppercase">مرحباً {username} | البيانات مفلترة حسب صلاحياتك</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-blue-400 border border-slate-700 rounded-xl text-[10px] font-black hover:bg-slate-700 transition-all"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} /> تحديث البيانات
+          </button>
           <button 
             onClick={() => setIsLoggedIn(false)} 
-            className="px-4 py-2 bg-slate-900 text-slate-400 border border-slate-700 rounded-xl text-[10px] font-black"
+            className="px-4 py-2 bg-slate-900/50 text-slate-400 border border-slate-700/50 rounded-xl text-[10px] font-black hover:text-red-400"
           >
-            تسجيل الخروج
+            خروج
           </button>
           <button 
             onClick={exportToExcel}
             className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-2xl font-black text-xs shadow-xl transition-all"
           >
-            <Download size={16} /> تحميل ملف Excel
+            <Download size={16} /> تحميل Excel
           </button>
         </div>
       </div>
@@ -167,46 +261,46 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
       {/* شريط الفلاتر */}
       <div className="bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-lg space-y-4">
         <h3 className="text-xs font-black text-slate-400 flex items-center gap-2 uppercase tracking-widest">
-           <Filter size={14} /> تصفية السجل
+           <Filter size={14} /> تصفية السجل المتقدمة
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">من تاريخ</label>
-            <input 
-              type="date" 
-              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-              value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">إلى تاريخ</label>
-            <input 
-              type="date" 
-              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500"
-              value={toDate}
-              onChange={e => setToDate(e.target.value)}
-            />
-          </div>
+          
+          <CustomDatePicker 
+            label="من تاريخ" 
+            value={fromDate} 
+            onChange={setFromDate} 
+            placeholder="اختر البداية" 
+          />
+          
+          <CustomDatePicker 
+            label="إلى تاريخ" 
+            value={toDate} 
+            onChange={setToDate} 
+            placeholder="اختر النهاية" 
+          />
+
           <div className="space-y-1">
             <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">الوظيفة</label>
-            <select 
-              className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none"
-              value={selectedJob}
-              onChange={e => setSelectedJob(e.target.value)}
-            >
-              <option value="">كل الوظائف المتاحة</option>
-              {availableJobs.map(job => (
-                <option key={job} value={job}>{job}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select 
+                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold outline-none focus:border-blue-500 appearance-none cursor-pointer"
+                value={selectedJob}
+                onChange={e => setSelectedJob(e.target.value)}
+              >
+                <option value="">كل الوظائف المتاحة</option>
+                {availableJobs.map(job => (
+                  <option key={job} value={job}>{job}</option>
+                ))}
+              </select>
+              <Briefcase size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
+            </div>
           </div>
           <div className="flex items-end">
              <button 
                onClick={() => { setFromDate(''); setToDate(''); setSelectedJob(''); }}
-               className="w-full px-6 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all"
+               className="w-full px-6 py-2.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all flex justify-center items-center gap-2"
              >
-               إعادة تعيين الفلتر
+               <X size={14} /> مسح الفلاتر
              </button>
           </div>
         </div>
@@ -227,7 +321,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
             <tbody className="divide-y divide-slate-700/50">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center text-slate-500 font-bold">لا توجد بيانات مسجلة مطابقة للفلاتر حالياً</td>
+                  <td colSpan={5} className="py-20 text-center text-slate-500 font-bold">لا توجد سجلات مطابقة للفلاتر المختارة</td>
                 </tr>
               ) : (
                 filteredRecords.map((r, idx) => (
@@ -259,7 +353,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl }) => {
                     <td className="py-4 px-4">
                       <div className="flex flex-col items-end">
                         <div className="text-white font-mono text-xs">{new Date(r.time).toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'})}</div>
-                        <div className="text-[9px] text-slate-500 font-bold flex items-center gap-1"><Calendar size={10} /> {new Date(r.date).toLocaleDateString('ar-EG')}</div>
+                        <div className="text-[9px] text-slate-500 font-bold flex items-center gap-1"><CalendarIcon size={10} /> {new Date(r.date).toLocaleDateString('ar-EG')}</div>
                       </div>
                     </td>
                   </tr>
