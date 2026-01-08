@@ -26,7 +26,19 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   lastUpdated 
 }) => {
   // تحديد الفرع الافتراضي للموظف عند تحميل الصفحة
-  const [selectedBranchId, setSelectedBranchId] = useState(user.defaultBranchId || '');
+  // تم التعديل لدعم المطابقة بالاسم أو الـ ID
+  const findInitialBranchId = () => {
+    if (!user.defaultBranchId) return '';
+    const branchById = branches.find(b => b.id === user.defaultBranchId);
+    if (branchById) return branchById.id;
+    
+    const branchByName = branches.find(b => b.name === user.defaultBranchId);
+    if (branchByName) return branchByName.id;
+    
+    return '';
+  };
+
+  const [selectedBranchId, setSelectedBranchId] = useState(findInitialBranchId());
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
@@ -40,9 +52,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   // تأكيد اختيار الفرع الافتراضي إذا تغيرت قائمة الفروع
   useEffect(() => {
     if (!selectedBranchId && user.defaultBranchId) {
-      setSelectedBranchId(user.defaultBranchId);
+      setSelectedBranchId(findInitialBranchId());
     }
-  }, [branches, user.defaultBranchId, selectedBranchId]);
+  }, [branches, user.defaultBranchId]);
 
   const getGeolocation = () => {
     setIsVerifying(true);
@@ -170,9 +182,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">موقع التسجيل</label>
               <div className="relative">
-                <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none shadow-inner focus:border-blue-500 transition-all">
+                <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none shadow-inner focus:border-blue-500 transition-all text-right">
                   <option value="">-- اختر الفرع للتسجيل --</option>
-                  {branches.map(b => <option key={b.id} value={b.id}>{b.name} {b.id === user.defaultBranchId ? '(الأساسي)' : ''}</option>)}
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.name} {(b.id === user.defaultBranchId || b.name === user.defaultBranchId) ? '(الأساسي)' : ''}
+                    </option>
+                  ))}
                 </select>
                 <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               </div>
@@ -219,7 +235,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             <div className="text-center py-10 opacity-20"><Clock size={40} className="mx-auto" /></div>
           ) : (
             myRecords.map(r => (
-              <div key={r.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-700/50 group hover:border-blue-500 transition-all">
+              <div key={r.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-700/50 group hover:border-blue-500 transition-all text-right">
                 <div className="flex justify-between font-black text-[10px] mb-1 uppercase tracking-tighter">
                   <span className="text-slate-300">{r.branchName}</span>
                   <span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span>
