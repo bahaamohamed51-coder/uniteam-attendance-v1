@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { User, AppConfig, Job } from '../types';
-import { UserPlus, LogIn, ShieldAlert, Briefcase, Loader2, Link as LinkIcon, Smartphone, AlertCircle, WifiOff } from 'lucide-react';
+import { User, AppConfig, Job, Branch } from '../types';
+import { UserPlus, LogIn, ShieldAlert, Briefcase, Loader2, Link as LinkIcon, Smartphone, AlertCircle, WifiOff, MapPin } from 'lucide-react';
 import { getDeviceFingerprint } from '../utils';
 
 interface LoginProps {
@@ -9,15 +9,17 @@ interface LoginProps {
   allUsers: User[];
   adminConfig: AppConfig;
   availableJobs: Job[];
+  branches: Branch[];
   setAdminConfig: (cfg: Partial<AppConfig>) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs, setAdminConfig }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs, branches, setAdminConfig }) => {
   const [mode, setMode] = useState<'register' | 'login' | 'admin' | 'connect'>(adminConfig.syncUrl ? 'login' : 'connect');
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [password, setPassword] = useState('');
   const [selectedJob, setSelectedJob] = useState('');
+  const [defaultBranch, setDefaultBranch] = useState('');
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [syncUrlInput, setSyncUrlInput] = useState('');
@@ -38,16 +40,16 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // منع التسجيل في حال عدم وجود إنترنت
     if (!navigator.onLine) {
-      setError('عذراً، لا يمكن إتمام عملية التسجيل والجهاز غير متصل بالإنترنت. يرجى التأكد من الاتصال والمحاولة مرة أخرى.');
+      setError('عذراً، لا يمكن إتمام عملية التسجيل والجهاز غير متصل بالإنترنت.');
       return;
     }
 
-    if (!fullName || !nationalId || !password || !selectedJob) {
-      setError('يرجى إكمال جميع البيانات واختيار الوظيفة');
+    if (!fullName || !nationalId || !password || !selectedJob || !defaultBranch) {
+      setError('يرجى إكمال جميع البيانات واختيار الوظيفة والفرع الأساسي');
       return;
     }
+    
     if (nationalId.length !== 14) {
       setError('الرقم القومي يجب أن يكون 14 رقماً');
       return;
@@ -60,17 +62,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     
     const deviceId = getDeviceFingerprint();
 
-    // 1. التأكد من أن الرقم القومي غير مسجل مسبقاً
     const existingById = allUsers.find(u => u.nationalId === nationalId);
     if (existingById) {
-      setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام. يرجى تسجيل الدخول.');
+      setError('عذراً، هذا الرقم القومي مسجل مسبقاً في النظام.');
       return;
     }
 
-    // 2. منع التسجيل إذا كان هذا الجهاز (Fingerprint) مرتبطاً بموظف آخر بالفعل
     const deviceOwner = allUsers.find(u => u.deviceId === deviceId);
     if (deviceOwner) {
-      setError(`عذراً، هذا الهاتف مرتبط بالفعل بحساب موظف آخر (${deviceOwner.fullName}). يمنع النظام تكرار الحسابات على نفس الجهاز.`);
+      setError(`عذراً، هذا الهاتف مرتبط بالفعل بحساب موظف آخر (${deviceOwner.fullName}).`);
       return;
     }
 
@@ -82,7 +82,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       password,
       role: 'employee',
       deviceId: deviceId,
-      jobTitle: selectedJob
+      jobTitle: selectedJob,
+      defaultBranchId: defaultBranch
     };
 
     if (adminConfig.googleSheetLink) {
@@ -109,9 +110,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
   const handleEmployeeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // منع تسجيل الدخول في حال عدم وجود إنترنت
     if (!navigator.onLine) {
-      setError('عذراً، لا يمكن تسجيل الدخول والجهاز غير متصل بالإنترنت. يرجى التأكد من الاتصال لتحديث بيانات الحساب.');
+      setError('عذراً، لا يمكن تسجيل الدخول والجهاز غير متصل بالإنترنت.');
       return;
     }
     
@@ -124,18 +124,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     
     if (user) {
       const currentDeviceId = getDeviceFingerprint();
-      
-      // 1. التحقق: هل هذا الهاتف (الذي يحاول الدخول الآن) يخص موظفاً آخر؟
       const otherDeviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
+      
       if (otherDeviceOwner) {
-        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر (${otherDeviceOwner.fullName}). لا يسمح بفتح حسابين من جهاز واحد.`);
+        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر (${otherDeviceOwner.fullName}).`);
         return;
       }
 
-      // 2. إذا كان حساب الموظف غير مربوط بجهاز حالياً (تم مسح الـ Device ID من قبل الأدمن)
       if (!user.deviceId || user.deviceId === "") {
         user.deviceId = currentDeviceId;
-        
         if (adminConfig.googleSheetLink) {
           try {
             await fetch(adminConfig.googleSheetLink, {
@@ -152,10 +149,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             console.error("Sync device update failed", err);
           }
         }
-      } 
-      // 3. إذا كان الحساب مربوطاً بجهاز بالفعل، يجب أن يكون هو نفس الجهاز الحالي
-      else if (user.deviceId !== currentDeviceId) {
-        setError('عذراً، هذا الحساب مربوط بهاتف آخر. يرجى مراجعة المسؤول لفك الارتباط القديم إذا قمت بتغيير هاتفك.');
+      } else if (user.deviceId !== currentDeviceId) {
+        setError('عذراً، هذا الحساب مربوط بهاتف آخر.');
         return;
       }
       
@@ -175,7 +170,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
   };
 
   const handleUnlink = () => {
-    if (window.confirm('هل أنت متأكد من رغبتك في فك الارتباط بالشركة الحالية؟ ستحتاج لإدخال الرابط مرة أخرى للوصول للنظام.')) {
+    if (window.confirm('هل أنت متأكد من رغبتك في فك الارتباط بالشركة الحالية؟')) {
       setAdminConfig({ syncUrl: '', googleSheetLink: '' });
       setMode('connect');
       setError('');
@@ -208,10 +203,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               ))}
             </div>
           ) : mode !== 'admin' && (
-            <div className="mb-8 p-4 bg-orange-900/20 border-r-4 border-orange-500 rounded-xl">
-              <p className="text-orange-400 text-xs font-bold leading-relaxed text-right">
-                التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" من المسؤول للبدء.
-              </p>
+            <div className="mb-8 p-4 bg-orange-900/20 border-r-4 border-orange-500 rounded-xl text-right">
+              <p className="text-orange-400 text-xs font-bold leading-relaxed">التطبيق غير مرتبط بشركة حالياً.</p>
             </div>
           )}
 
@@ -230,10 +223,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
           {mode === 'connect' && (
             <form onSubmit={handleConnect} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-[10px] text-slate-500 font-black mr-2 uppercase tracking-widest">رابط الشركة (Sync URL)</label>
-                <input type="text" placeholder="https://script.google.com/..." value={syncUrlInput} onChange={e => setSyncUrlInput(e.target.value)} className={inputClasses} />
-              </div>
+              <input type="text" placeholder="https://script.google.com/..." value={syncUrlInput} onChange={e => setSyncUrlInput(e.target.value)} className={inputClasses} />
               <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 <LinkIcon size={20} /> ربط التطبيق بالشركة
               </button>
@@ -243,24 +233,27 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
           {mode === 'register' && (
             <form onSubmit={handleRegister} className="space-y-4">
-              <div className="flex items-center gap-2 mb-2 p-3 bg-blue-900/20 rounded-xl border border-blue-800/50">
-                <Smartphone size={16} className="text-blue-400" />
-                <span className="text-[9px] text-blue-300 font-bold">قيد أمان: سيتم قفل حسابك على هذا الهاتف فقط.</span>
-              </div>
               <input type="text" placeholder="الاسم الرباعي" value={fullName} onChange={e => setFullName(e.target.value)} className={inputClasses} />
               <input type="text" placeholder="الرقم القومي (14 رقم)" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} className={inputClasses} />
+              
               <div className="relative">
-                <select 
-                  value={selectedJob} 
-                  onChange={e => setSelectedJob(e.target.value)}
-                  className={`${inputClasses} appearance-none cursor-pointer`}
-                >
+                <select value={selectedJob} onChange={e => setSelectedJob(e.target.value)} className={`${inputClasses} appearance-none cursor-pointer text-right`}>
                   <option value="" className="bg-slate-900">-- اختر الوظيفة --</option>
                   {availableJobs.map(job => <option key={job.id} value={job.title} className="bg-slate-900">{job.title}</option>)}
                 </select>
                 <Briefcase size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
+
+              <div className="relative">
+                <select value={defaultBranch} onChange={e => setDefaultBranch(e.target.value)} className={`${inputClasses} appearance-none cursor-pointer text-right`}>
+                  <option value="" className="bg-slate-900">-- اختر فرع العمل الأساسي --</option>
+                  {branches.map(b => <option key={b.id} value={b.id} className="bg-slate-900">{b.name}</option>)}
+                </select>
+                <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+
               <input type="password" placeholder="تعيين كلمة مرور" minLength={6} value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
+              
               <button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
                 {isLoading ? <Loader2 className="animate-spin" size={20} /> : <UserPlus size={20} />} 
                 {isLoading ? 'جاري الحفظ...' : 'تسجيل وتأمين الهاتف'}
@@ -270,16 +263,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
           {mode === 'login' && (
             <form onSubmit={handleEmployeeLogin} className="space-y-4">
-              <input 
-                type="text" 
-                placeholder="الرقم القومي" 
-                maxLength={14} 
-                value={nationalId} 
-                onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} 
-                className={inputClasses} 
-              />
+              <input type="text" placeholder="الرقم القومي" maxLength={14} value={nationalId} onChange={e => setNationalId(e.target.value.replace(/\D/g, ''))} className={inputClasses} />
               <input type="password" placeholder="كلمة المرور" value={password} onChange={e => setPassword(e.target.value)} className={inputClasses} />
-              <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all">
+              <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-lg flex items-center justify-center gap-2 transition-all text-sm">
                 <LogIn size={20} /> دخول الموظف
               </button>
             </form>
@@ -296,13 +282,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
             </form>
           )}
 
-          {/* خيار فك الارتباط / تغيير الرابط */}
           {adminConfig.syncUrl && mode !== 'admin' && (
-            <button 
-              type="button" 
-              onClick={handleUnlink}
-              className="mt-6 w-full text-slate-500 hover:text-red-400 text-[10px] font-black py-2 uppercase tracking-widest flex items-center justify-center gap-1.5 transition-colors border-t border-slate-700/50 pt-4"
-            >
+            <button type="button" onClick={handleUnlink} className="mt-6 w-full text-slate-500 hover:text-red-400 text-[10px] font-black py-2 border-t border-slate-700/50 pt-4 uppercase flex items-center justify-center gap-1.5 transition-colors">
               <LinkIcon size={12} className="rotate-45" /> تغيير رابط الشركة / فك الارتباط
             </button>
           )}
