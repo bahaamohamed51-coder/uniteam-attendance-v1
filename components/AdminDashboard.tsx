@@ -32,7 +32,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<Partial<User>>({});
 
-  // ... (الحفاظ على بقية الـ States للحسابات والتقارير) ...
   const [newRepUser, setNewRepUser] = useState('');
   const [newRepPass, setNewRepPass] = useState('');
   const [selectedJobsForAcc, setSelectedJobsForAcc] = useState<string[]>([]);
@@ -47,6 +46,42 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jobFileInputRef = useRef<HTMLInputElement>(null);
+
+  // وظيفة لتنسيق الوقت للعرض (ص/م)
+  const formatTimeDisplay = (timeStr: string | undefined) => {
+    if (!timeStr) return '--:--';
+    // إذا كان التاريخ طويلاً (من جوجل شيت)
+    if (timeStr.includes('GMT') || timeStr.includes('1899')) {
+      try {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+      } catch(e) {}
+    }
+    // إذا كان التنسيق HH:mm
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+      const [h, m] = timeStr.split(':').map(Number);
+      const suffix = h >= 12 ? 'م' : 'ص';
+      const displayH = h % 12 || 12;
+      return `${displayH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${suffix}`;
+    }
+    return timeStr;
+  };
+
+  // وظيفة لتنظيف الوقت وإرجاع HH:mm فقط من أجل input type=time
+  const normalizeToTimeInput = (timeStr: string | undefined): string => {
+    if (!timeStr) return "09:00";
+    if (timeStr.includes('GMT') || timeStr.includes('1899')) {
+      const d = new Date(timeStr);
+      if (!isNaN(d.getTime())) {
+        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+      }
+    }
+    // التأكد من إرجاع HH:mm فقط حتى لو كان هناك ص/م
+    const match = timeStr.match(/(\d{2}:\d{2})/);
+    return match ? match[1] : timeStr;
+  };
 
   const pushToCloud = async () => {
     if (!config.syncUrl) return alert("يرجى ضبط رابط المزامنة أولاً");
@@ -78,12 +113,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const inputClasses = "px-4 py-3 rounded-xl border border-slate-600 bg-slate-900 text-white font-bold outline-none focus:border-blue-500 w-full transition-all";
 
-  // ... (الحفاظ على وظائف Excel والمشاركة) ...
   const shareInviteLink = async () => {
     const link = window.location.origin + window.location.pathname + (config.syncUrl ? `?c=${btoa(config.syncUrl)}` : '');
     if (navigator.share) { try { await navigator.share({ title: 'نظام الحضور - Uniteam', text: 'رابط تسجيل الموظفين:', url: link }); } catch (err) {} }
     else { navigator.clipboard.writeText(link).then(() => alert("تم نسخ الرابط!")); }
   };
+
   const downloadTemplate = (type: 'branches' | 'jobs') => {
     let data = type === 'branches' ? [{ "اسم الفرع": "الفرع الرئيسي", "خط العرض": 30.05, "خط الطول": 31.23, "النطاق بالمتر": 100 }] : [{ "اسم الوظيفة": "مهندس" }];
     const ws = XLSX.utils.json_to_sheet(data);
@@ -91,6 +126,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `template_${type}.xlsx`);
   };
+
   const handleExcelImport = (e: React.ChangeEvent<HTMLInputElement>, type: 'branches' | 'jobs') => {
     const file = e.target.files?.[0]; if (!file) return;
     const reader = new FileReader(); reader.onload = (evt) => {
@@ -103,12 +139,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if(e.target) e.target.value = '';
     }; reader.readAsBinaryString(file);
   };
+
   const saveEditBranch = (id: string) => { setBranches(prev => prev.map(b => b.id === id ? { ...b, ...editBranchData } as Branch : b)); setEditingBranchId(null); };
+
   const addReportAccount = () => {
     if (!newRepUser || !newRepPass || selectedJobsForAcc.length === 0) return alert("يرجى ملء كافة البيانات واختيار وظيفة واحدة على الأقل");
     const newAcc: ReportAccount = { id: Math.random().toString(36).substr(2, 9), username: newRepUser, password: newRepPass, allowedJobs: selectedJobsForAcc };
     setReportAccounts?.([...reportAccounts, newAcc]); setNewRepUser(''); setNewRepPass(''); setSelectedJobsForAcc([]);
   };
+
   const saveEditReportAcc = (id: string) => {
     if (!editReportData.username || !editReportData.password || !editReportData.allowedJobs || editReportData.allowedJobs.length === 0) { alert("يرجى التأكد من اسم المستخدم وكلمة المرور واختيار وظيفة واحدة على الأقل"); return; }
     setReportAccounts?.(prev => prev.map(acc => acc.id === id ? { ...acc, ...editReportData } as ReportAccount : acc)); setEditingReportId(null);
@@ -116,7 +155,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* ... (الحفاظ على ترويسة الصفحة والتبويبات) ... */}
       <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx, .xls" onChange={(e) => handleExcelImport(e, 'branches')} />
       <input type="file" ref={jobFileInputRef} className="hidden" accept=".xlsx, .xls" onChange={(e) => handleExcelImport(e, 'jobs')} />
 
@@ -186,8 +224,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  </thead>
                  <tbody>
                   {allUsers.map(user => (
-                   <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-all">
-                     <td className="py-4 px-2">
+                   <tr key={user.id} className="border-b border-slate-700/50 hover:bg-slate-900/30 transition-all text-center">
+                     <td className="py-4 px-2 text-right">
                         {editingUserId === user.id ? (
                           <div className="space-y-1">
                             <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full" value={editUserData.fullName || ''} onChange={e => setEditUserData({...editUserData, fullName: e.target.value})} />
@@ -202,12 +240,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
                         )}
                      </td>
-                     <td className="py-4 px-2 text-slate-400 text-xs text-center font-mono">
+                     <td className="py-4 px-2 text-slate-400 text-xs font-mono">
                         {editingUserId === user.id ? (
                           <input className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full text-center" value={editUserData.nationalId || ''} onChange={e => setEditUserData({...editUserData, nationalId: e.target.value})} />
                         ) : user.nationalId}
                      </td>
-                     <td className="py-4 px-2 text-center">
+                     <td className="py-4 px-2">
                         {editingUserId === user.id ? (
                           <select className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-[10px] w-full" value={editUserData.defaultBranchId || ''} onChange={e => setEditUserData({...editUserData, defaultBranchId: e.target.value})}>
                             {branches.map(b => <option key={b.id} value={b.name}>{b.name}</option>)}
@@ -216,26 +254,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <span className="text-xs text-slate-300 font-bold">{user.defaultBranchId || 'غير محدد'}</span>
                         )}
                      </td>
-                     <td className="py-4 px-2 text-center">
+                     <td className="py-4 px-2">
                         {editingUserId === user.id ? (
                           <input type="time" className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full text-center" value={editUserData.checkInTime || ''} onChange={e => setEditUserData({...editUserData, checkInTime: e.target.value})} />
                         ) : (
-                          <div className="flex items-center justify-center gap-1 text-green-400 font-bold text-xs"><Clock size={12}/> {user.checkInTime || '09:00'}</div>
+                          <div className="flex items-center justify-center gap-1 text-green-400 font-bold text-xs"><Clock size={12}/> {formatTimeDisplay(user.checkInTime || '09:00')}</div>
                         )}
                      </td>
-                     <td className="py-4 px-2 text-center">
+                     <td className="py-4 px-2">
                         {editingUserId === user.id ? (
                           <input type="time" className="bg-slate-900 border border-blue-500 rounded px-2 py-1 text-xs w-full text-center" value={editUserData.checkOutTime || ''} onChange={e => setEditUserData({...editUserData, checkOutTime: e.target.value})} />
                         ) : (
-                          <div className="flex items-center justify-center gap-1 text-orange-400 font-bold text-xs"><Clock size={12}/> {user.checkOutTime || '17:00'}</div>
+                          <div className="flex items-center justify-center gap-1 text-orange-400 font-bold text-xs"><Clock size={12}/> {formatTimeDisplay(user.checkOutTime || '17:00')}</div>
                         )}
                      </td>
-                     <td className="py-4 px-2 text-center">
+                     <td className="py-4 px-2">
                         <div className={`flex items-center justify-center gap-1 px-3 py-1 rounded-full text-[9px] font-black border mx-auto w-fit ${user.deviceId ? 'bg-green-600/10 text-green-400 border-green-900/30' : 'bg-slate-900 text-slate-500 border-slate-700'}`}>
                           <Smartphone size={10} /> {user.deviceId ? 'مربوط' : 'غير مربوط'}
                         </div>
                      </td>
-                     <td className="py-4 px-2 text-center">
+                     <td className="py-4 px-2">
                         <div className="flex justify-center gap-2">
                            {editingUserId === user.id ? (
                              <>
@@ -244,7 +282,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              </>
                            ) : (
                              <>
-                               <button onClick={() => { setEditingUserId(user.id); setEditUserData(user); }} className="text-blue-400 hover:bg-blue-900/20 p-1.5 rounded"><Edit2 size={16}/></button>
+                               <button onClick={() => { 
+                                 setEditingUserId(user.id); 
+                                 // تنظيف الوقت قبل وضعه في حالة التعديل ليتم قراءته بواسطة input type=time
+                                 setEditUserData({
+                                   ...user,
+                                   checkInTime: normalizeToTimeInput(user.checkInTime),
+                                   checkOutTime: normalizeToTimeInput(user.checkOutTime)
+                                 }); 
+                               }} className="text-blue-400 hover:bg-blue-900/20 p-1.5 rounded"><Edit2 size={16}/></button>
                                {user.deviceId && <button onClick={() => setAllUsers(allUsers.map(u => u.id === user.id ? {...u, deviceId: ""} : u))} className="text-orange-400 hover:bg-orange-900/20 p-1.5 rounded" title="فك ارتباط الجهاز"><Unlink size={16}/></button>}
                                <button onClick={() => { if(confirm('حذف الموظف؟')) setAllUsers(allUsers.filter(u => u.id !== user.id)) }} className="text-slate-500 hover:text-red-400 p-1.5"><Trash2 size={16}/></button>
                              </>
@@ -252,12 +298,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                      </td>
                    </tr>
-                 ))}</tbody>
+                  ))}</tbody>
                </table>
              </div>
            </div>
         )}
-        {/* الحفاظ على بقية التبويبات (الفروع، الوظائف، الإعدادات، الصلاحيات) */}
         {activeTab === 'branches' && (
           <div className="space-y-6">
             <div className="flex justify-between items-center">
