@@ -133,12 +133,12 @@ const App: React.FC = () => {
 
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 md:p-6 pb-24">
         {activeView === 'reports' && !currentUser ? (
-          <ReportsView syncUrl={config.syncUrl} />
+          <ReportsView syncUrl={config.syncUrl} adminConfig={config} />
         ) : (
           !currentUser ? (
             <Login 
               onLogin={handleLogin} allUsers={allUsers} adminConfig={config} availableJobs={jobs}
-              branches={branches} // تمرير الفروع للتسجيل
+              branches={branches} 
               setAdminConfig={(newCfg) => {
                 const cfg = { ...config, ...newCfg };
                 setConfig(cfg);
