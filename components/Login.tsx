@@ -75,6 +75,11 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     }
 
     setIsLoading(true);
+
+    // البحث عن اسم الفرع لتخزينه في الشيت بدلاً من الـ ID
+    const branchObj = branches.find(b => b.id === defaultBranch);
+    const branchNameForSheet = branchObj ? branchObj.name : defaultBranch;
+
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
       fullName,
@@ -83,7 +88,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       role: 'employee',
       deviceId: deviceId,
       jobTitle: selectedJob,
-      defaultBranchId: defaultBranch
+      defaultBranchId: branchNameForSheet, // تخزين الاسم بناءً على طلب المستخدم
+      registrationDate: new Date().toISOString()
     };
 
     if (adminConfig.googleSheetLink) {
@@ -95,7 +101,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
           body: JSON.stringify({ 
             action: 'registerUser',
             ...newUser,
-            timestamp: new Date().toISOString()
+            timestamp: newUser.registrationDate
           })
         });
       } catch (err) {
