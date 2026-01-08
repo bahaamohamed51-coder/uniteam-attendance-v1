@@ -1,19 +1,26 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X, Link as LinkIcon, AlertCircle, Check } from 'lucide-react';
+import { FileSpreadsheet, Download, LogIn, Loader2, Table, Calendar as CalendarIcon, MapPin, User as UserIcon, Briefcase, Filter, RefreshCw, ChevronRight, ChevronLeft, X, Link as LinkIcon, AlertCircle, Check, ShieldCheck } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { AppConfig } from '../types';
 
 interface ReportsViewProps {
   syncUrl: string;
+  adminConfig: AppConfig;
 }
 
 // مكون التقويم المدمج
-const CustomDatePicker: React.FC<{ 
+const CustomDatePicker = ({ 
+  label, 
+  value, 
+  onChange, 
+  placeholder 
+}: { 
   label: string, 
   value: string, 
   onChange: (val: string) => void,
   placeholder: string
-}> = ({ label, value, onChange, placeholder }) => {
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
 
@@ -82,11 +89,12 @@ const CustomDatePicker: React.FC<{
   );
 };
 
-const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) => {
+export default function ReportsView({ syncUrl: initialSyncUrl, adminConfig }: ReportsViewProps) {
   const [localSyncUrl, setLocalSyncUrl] = useState(initialSyncUrl || localStorage.getItem('attendance_temp_sync_url') || '');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [records, setRecords] = useState<any[]>([]);
@@ -125,13 +133,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
       } else {
         setRecords(data);
         setIsLoggedIn(true);
-        // حفظ الرابط للاستخدام اللاحق إذا كان صحيحاً
+        // تحقق إذا كان الداخل هو المسؤول
+        if (adminConfig && username === adminConfig.adminUsername && password === adminConfig.adminPassword) {
+           setIsAdminLogin(true);
+        } else {
+           setIsAdminLogin(false);
+        }
         localStorage.setItem('attendance_temp_sync_url', activeSyncUrl);
         setShowUrlField(false);
       }
     } catch (err) {
       setError('حدث خطأ أثناء الاتصال بالسحابة. تأكد من صحة رابط المزامنة.');
-      setShowUrlField(true); // إظهار حقل الرابط عند حدوث خطأ في الاتصال
+      setShowUrlField(true);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -294,7 +307,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
       <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-800 p-6 rounded-3xl border border-slate-700 shadow-xl">
         <div className="text-right w-full md:w-auto">
           <h2 className="text-xl font-black text-blue-400 flex items-center gap-2">
-            <Table size={24} /> متابعة التقارير والوظائف
+            {isAdminLogin ? <ShieldCheck size={24} className="text-orange-400" /> : <Table size={24} />} 
+            متابعة التقارير والوظائف {isAdminLogin && <span className="text-[10px] text-orange-400 bg-orange-400/10 px-2 py-0.5 rounded-lg border border-orange-400/20 mr-2">Admin Mode</span>}
           </h2>
           <p className="text-slate-500 text-[10px] font-black uppercase">المسؤول: {username}</p>
         </div>
@@ -379,6 +393,4 @@ const ReportsView: React.FC<ReportsViewProps> = ({ syncUrl: initialSyncUrl }) =>
       </div>
     </div>
   );
-};
-
-export default ReportsView;
+}
