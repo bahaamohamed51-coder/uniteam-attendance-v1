@@ -85,12 +85,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     return timeStr;
   };
 
-  const calculateTimeDiff = (type: 'check-in' | 'check-out'): string => {
+  const calculateTimeDiffDetails = (type: 'check-in' | 'check-out') => {
     let scheduledTimeStr = type === 'check-in' ? (user.checkInTime || "09:00") : (user.checkOutTime || "17:00");
-    
     let schedH = 9, schedM = 0;
 
-    // معالجة إذا كان الوقت قادم من جوجل بصيغة تاريخ
     if (scheduledTimeStr.includes('GMT') || scheduledTimeStr.includes('1899')) {
        const d = new Date(scheduledTimeStr);
        if (!isNaN(d.getTime())) {
@@ -114,45 +112,80 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     const m = absMins % 60;
     
     let timeStr = `${h > 0 ? h + ' ساعة و ' : ''}${m} دقيقة`;
-    
+    let isLate = false;
+    let resultString = "";
+
     if (type === 'check-in') {
-      return diffMinsTotal > 0 ? `حضور متأخر ${timeStr}` : `حضور مبكر ${timeStr}`;
+      isLate = diffMinsTotal > 0;
+      resultString = isLate ? `حضور متأخر ${timeStr}` : `حضور مبكر ${timeStr}`;
     } else {
-      return diffMinsTotal < 0 ? `انصراف مبكر ${timeStr}` : `انصراف متأخر ${timeStr}`;
+      isLate = diffMinsTotal < 0; // انصراف مبكر يعتبر "تأخير عن موعد الانصراف الكامل"
+      resultString = diffMinsTotal < 0 ? `انصراف مبكر ${timeStr}` : `انصراف متأخر ${timeStr}`;
     }
+
+    return { resultString, isLate, diffMinsTotal };
   };
 
   const handleAttendance = async (type: 'check-in' | 'check-out') => {
-    if (!navigator.onLine) { setStatus({ type: 'error', msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت.' }); return; }
-    if (!selectedBranchId || !currentLocation) { setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' }); return; }
+    // 1. التحقق من الاتصال بالإنترنت والبيانات السحابية
+    if (!navigator.onLine || !googleSheetLink) { 
+      setStatus({ type: 'error', msg: 'عذراً، يجب أن يكون الهاتف متصلاً بالإنترنت وبالبيانات السحابية لإرسال التسجيل.' }); 
+      return; 
+    }
+
+    if (!selectedBranchId || !currentLocation) { 
+      setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' }); 
+      return; 
+    }
+
     const locationAge = Date.now() - currentLocation.timestamp;
-    if (locationAge > 60000) { setStatus({ type: 'error', msg: 'بيانات الموقع قديمة. يرجى تحديث الموقع.' }); return; }
+    if (locationAge > 60000) { 
+      setStatus({ type: 'error', msg: 'بيانات الموقع قديمة. يرجى تحديث الموقع.' }); 
+      return; 
+    }
+
     const branch = branches.find(b => b.id === selectedBranchId);
     if (!branch) return;
-    const distance = calculateDistance(currentLocation.lat, currentLocation.lng, branch.latitude, branch.longitude);
-    if (distance > branch.radius) { setStatus({ type: 'error', msg: `بعيد عن الفرع بمسافة ${Math.round(distance)}م. الحد المسموح ${branch.radius}م.` }); return; }
 
-    const timeDiffString = calculateTimeDiff(type);
+    const distance = calculateDistance(currentLocation.lat, currentLocation.lng, branch.latitude, branch.longitude);
+    if (distance > branch.radius) { 
+      setStatus({ type: 'error', msg: `بعيد عن الفرع بمسافة ${Math.round(distance)}م. الحد المسموح ${branch.radius}م.` }); 
+      return; 
+    }
+
+    const timeInfo = calculateTimeDiffDetails(type);
+
+    // 2. التحقق من ضرورة وجود سبب في حالة التأخير (للحضور فقط)
+    if (type === 'check-in' && timeInfo.isLate && reasonText.trim() === "") {
+      setStatus({ type: 'error', msg: 'تنبيه: أنت متأخر عن الموعد الافتراضي، يجب كتابة سبب التأخير في خانة الملاحظات قبل الإرسال.' });
+      return;
+    }
 
     const newRecord: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
       userId: user.id, userName: user.fullName, userJob: user.jobTitle,
       branchId: branch.id, branchName: branch.name, type: type,
       timestamp: new Date().toISOString(), latitude: currentLocation.lat, longitude: currentLocation.lng,
-      reason: reasonText.trim(), timeDiff: timeDiffString
+      reason: reasonText.trim(), timeDiff: timeInfo.resultString
     };
 
-    setRecords(prev => [...prev, newRecord]);
-    setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح. (${timeDiffString})` });
-    setReasonText('');
-
-    if (googleSheetLink) {
-      try {
-        await fetch(googleSheetLink, {
+    setIsVerifying(true); // استخدام حالة التحميل لمنع النقرات المتكررة
+    try {
+      if (googleSheetLink) {
+        const response = await fetch(googleSheetLink, {
           method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'saveAttendance', ...newRecord, nationalId: user.nationalId })
         });
-      } catch (err) { console.error(err); }
+        // بما أننا نستخدم no-cors، لا يمكننا قراءة الاستجابة، نعتمد على الإضافة المحلية
+      }
+      
+      setRecords(prev => [...prev, newRecord]);
+      setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح. (${timeInfo.resultString})` });
+      setReasonText('');
+    } catch (err) {
+      setStatus({ type: 'error', msg: 'حدث خطأ أثناء الإرسال للسحابة. يرجى المحاولة مرة أخرى.' });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -175,11 +208,16 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
              <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">{currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
              <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
              <div className="mt-4 flex justify-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الحضور: {formatTimeDisplay(user.checkInTime || '09:00')}</span>
-                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الانصراف: {formatTimeDisplay(user.checkOutTime || '17:00')}</span>
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">موعد الحضور: {formatTimeDisplay(user.checkInTime || '09:00')}</span>
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">موعد الانصراف: {formatTimeDisplay(user.checkOutTime || '17:00')}</span>
              </div>
           </div>
           <div className="space-y-6 max-w-md mx-auto">
+            {!googleSheetLink && (
+              <div className="p-3 bg-red-900/40 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-200 text-[10px] font-black uppercase">
+                <Cloud size={16} /> التطبيق غير مربوط بالسحابة - لن يتم الإرسال
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">موقع التسجيل</label>
               <div className="relative">
@@ -191,7 +229,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter flex items-center gap-1"><FileText size={12} /> ملاحظات (سبب التأخير / الانصراف المبكر)</label>
+              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter flex items-center gap-1"><FileText size={12} /> ملاحظات / سبب التأخير (إلزامي عند التأخير)</label>
               <textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder="اكتب السبب هنا في حال وجود تأخير أو انصراف مبكر..." className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-right h-24 resize-none shadow-inner text-xs placeholder:text-slate-600" />
             </div>
             <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex flex-col gap-3 shadow-inner">
@@ -205,8 +243,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
             {status.type !== 'none' && (<div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>{status.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle size={20} className="shrink-0" />}<span className="leading-relaxed">{status.msg}</span></div>)}
             <div className="grid grid-cols-2 gap-4">
-              <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
-              <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
+              <button disabled={isVerifying} onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
+              <button disabled={isVerifying} onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
             </div>
           </div>
         </div>
