@@ -113,7 +113,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           branches: branches,
           jobs: jobs,
           users: allUsers,
-          reportAccounts: reportAccounts
+          reportAccounts: reportAccounts,
+          adminUsername: config.adminUsername, // إرسال اسم المستخدم للمسؤول
+          adminPassword: config.adminPassword  // إرسال كلمة مرور المسؤول
         })
       });
       alert("تم إرسال البيانات للسحابة بنجاح!");
