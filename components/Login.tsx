@@ -13,7 +13,14 @@ interface LoginProps {
   setAdminConfig: (cfg: Partial<AppConfig>) => void;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, availableJobs, branches, setAdminConfig }) => {
+export default function Login({ 
+  onLogin, 
+  allUsers, 
+  adminConfig, 
+  availableJobs, 
+  branches, 
+  setAdminConfig 
+}: LoginProps) {
   const [mode, setMode] = useState<'register' | 'login' | 'admin' | 'connect'>(adminConfig.syncUrl ? 'login' : 'connect');
   const [fullName, setFullName] = useState('');
   const [nationalId, setNationalId] = useState('');
@@ -76,7 +83,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
     setIsLoading(true);
 
-    // البحث عن اسم الفرع لتخزينه في الشيت بدلاً من الـ ID
     const branchObj = branches.find(b => b.id === defaultBranch);
     const branchNameForSheet = branchObj ? branchObj.name : defaultBranch;
 
@@ -88,7 +94,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       role: 'employee',
       deviceId: deviceId,
       jobTitle: selectedJob,
-      defaultBranchId: branchNameForSheet, // تخزين الاسم بناءً على طلب المستخدم
+      defaultBranchId: branchNameForSheet,
       registrationDate: new Date().toISOString()
     };
 
@@ -297,6 +303,4 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       </div>
     </div>
   );
-};
-
-export default Login;
+}
