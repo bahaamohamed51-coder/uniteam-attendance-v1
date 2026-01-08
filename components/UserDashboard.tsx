@@ -41,7 +41,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
-  const [reason, setReason] = useState(''); // حالة الملاحظات الجديدة
+  const [reasonText, setReasonText] = useState(''); // تم تغيير الاسم لتجنب التعارض
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -49,7 +49,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // تأكيد اختيار الفرع الافتراضي إذا تغيرت قائمة الفروع
   useEffect(() => {
     if (!selectedBranchId && user.defaultBranchId) {
       setSelectedBranchId(findInitialBranchId());
@@ -108,6 +107,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       return;
     }
 
+    // إنشاء السجل مع التأكد من مطابقة نوع AttendanceRecord
     const newRecord: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
       userId: user.id,
@@ -115,16 +115,16 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       userJob: user.jobTitle,
       branchId: branch.id,
       branchName: branch.name,
-      type,
+      type: type,
       timestamp: new Date().toISOString(),
       latitude: currentLocation.lat,
       longitude: currentLocation.lng,
-      reason: reason.trim() // إرسال السبب
+      reason: reasonText.trim() // إرسال السبب
     };
 
     setRecords(prev => [...prev, newRecord]);
     setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح.` });
-    setReason(''); // مسح مربع النص بعد النجاح
+    setReasonText(''); // مسح مربع النص بعد النجاح
 
     if (googleSheetLink) {
       try {
@@ -201,8 +201,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
                 <FileText size={12} /> ملاحظات (سبب التأخير / الانصراف المبكر)
               </label>
               <textarea 
-                value={reason} 
-                onChange={e => setReason(e.target.value)}
+                value={reasonText} 
+                onChange={e => setReasonText(e.target.value)}
                 placeholder="اكتب السبب هنا في حال وجود تأخير أو انصراف مبكر..."
                 className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-right h-24 resize-none shadow-inner text-xs placeholder:text-slate-600"
               />
