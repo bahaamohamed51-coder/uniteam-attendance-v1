@@ -43,6 +43,7 @@ export interface AttendanceRecord {
   timestamp: string;
   latitude: number;
   longitude: number;
+  reason?: string; // سبب التأخير أو الانصراف المبكر
 }
 
 export interface AppConfig {
