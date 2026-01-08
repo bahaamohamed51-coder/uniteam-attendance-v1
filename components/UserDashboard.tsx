@@ -25,8 +25,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   isSyncing, 
   lastUpdated 
 }) => {
-  const [selectedBranchId, setSelectedBranchId] = useState('');
-  // أضفنا الـ timestamp لمتابعة وقت آخر تحديث للموقع
+  // تحديد الفرع الافتراضي للموظف عند تحميل الصفحة
+  const [selectedBranchId, setSelectedBranchId] = useState(user.defaultBranchId || '');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
@@ -36,6 +36,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // تأكيد اختيار الفرع الافتراضي إذا تغيرت قائمة الفروع
+  useEffect(() => {
+    if (!selectedBranchId && user.defaultBranchId) {
+      setSelectedBranchId(user.defaultBranchId);
+    }
+  }, [branches, user.defaultBranchId, selectedBranchId]);
 
   const getGeolocation = () => {
     setIsVerifying(true);
@@ -47,7 +54,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
           timestamp: Date.now() 
         });
         setIsVerifying(false);
-        // مسح رسائل الخطأ المتعلقة بالموقع عند التحديث بنجاح
         if (status.msg.includes('الموقع الجغرافي قديم')) {
           setStatus({ type: 'none', msg: '' });
         }
@@ -61,12 +67,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   };
 
   const handleAttendance = async (type: 'check-in' | 'check-out') => {
-    // 1. التحقق من الاتصال بالإنترنت
     if (!navigator.onLine) {
-      setStatus({ 
-        type: 'error', 
-        msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت. يرجى تفعيل البيانات أو الواي فاي.' 
-      });
+      setStatus({ type: 'error', msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت.' });
       return;
     }
 
@@ -75,13 +77,9 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       return;
     }
 
-    // 2. التحقق من حداثة الموقع (أقل من دقيقة واحدة = 60000 مللي ثانية)
     const locationAge = Date.now() - currentLocation.timestamp;
     if (locationAge > 60000) {
-      setStatus({ 
-        type: 'error', 
-        msg: 'بيانات الموقع قديمة (مر عليها أكثر من دقيقة). يرجى تحديث الموقع قبل التسجيل.' 
-      });
+      setStatus({ type: 'error', msg: 'بيانات الموقع قديمة. يرجى تحديث الموقع.' });
       return;
     }
 
@@ -131,8 +129,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   };
 
   const myRecords = records.filter(r => r.userId === user.id).slice(-5).reverse();
-
-  // حساب الثواني المتبقية لصلاحية الموقع (للعرض فقط)
   const locationAgeSeconds = currentLocation ? Math.floor((Date.now() - currentLocation.timestamp) / 1000) : 0;
 
   return (
@@ -140,11 +136,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-slate-800 rounded-3xl shadow-xl border border-slate-700 p-8 text-white relative overflow-hidden">
           <div className="absolute left-6 top-6 flex flex-col items-end gap-2">
-            <button 
-              onClick={onRefresh}
-              disabled={isSyncing}
-              className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95"
-            >
+            <button onClick={onRefresh} disabled={isSyncing} className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95">
               <RotateCcw size={20} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
             </button>
             {lastUpdated && (
@@ -176,11 +168,11 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             )}
 
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">اختر موقع العمل الحالي</label>
+              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">موقع التسجيل</label>
               <div className="relative">
                 <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none shadow-inner focus:border-blue-500 transition-all">
                   <option value="">-- اختر الفرع للتسجيل --</option>
-                  {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.name} {b.id === user.defaultBranchId ? '(الأساسي)' : ''}</option>)}
                 </select>
                 <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               </div>
@@ -213,18 +205,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             )}
 
             <div className="grid grid-cols-2 gap-4">
-              <button 
-                onClick={() => handleAttendance('check-in')} 
-                className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                حضور
-              </button>
-              <button 
-                onClick={() => handleAttendance('check-out')} 
-                className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                انصراف
-              </button>
+              <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
+              <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
             </div>
           </div>
         </div>
