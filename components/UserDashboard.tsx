@@ -116,7 +116,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     let timeStr = `${h > 0 ? h + ' ساعة و ' : ''}${m} دقيقة`;
     
     if (type === 'check-in') {
-      return diffMinsTotal > 0 ? `متأخر ${timeStr}` : `مبكر ${timeStr}`;
+      return diffMinsTotal > 0 ? `حضور متأخر ${timeStr}` : `حضور مبكر ${timeStr}`;
     } else {
       return diffMinsTotal < 0 ? `انصراف مبكر ${timeStr}` : `انصراف متأخر ${timeStr}`;
     }
