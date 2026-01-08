@@ -65,9 +65,44 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     );
   };
 
+  // وظيفة لتنسيق الوقت للعرض (ص/م)
+  const formatTimeDisplay = (timeStr: string | undefined) => {
+    if (!timeStr) return '--:--';
+    if (timeStr.includes('GMT') || timeStr.includes('1899')) {
+      try {
+        const d = new Date(timeStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+        }
+      } catch(e) {}
+    }
+    if (/^\d{2}:\d{2}$/.test(timeStr)) {
+      const [h, m] = timeStr.split(':').map(Number);
+      const suffix = h >= 12 ? 'م' : 'ص';
+      const displayH = h % 12 || 12;
+      return `${displayH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${suffix}`;
+    }
+    return timeStr;
+  };
+
   const calculateTimeDiff = (type: 'check-in' | 'check-out'): string => {
-    const scheduledTimeStr = type === 'check-in' ? (user.checkInTime || "09:00") : (user.checkOutTime || "17:00");
-    const [schedH, schedM] = scheduledTimeStr.split(':').map(Number);
+    let scheduledTimeStr = type === 'check-in' ? (user.checkInTime || "09:00") : (user.checkOutTime || "17:00");
+    
+    let schedH = 9, schedM = 0;
+
+    // معالجة إذا كان الوقت قادم من جوجل بصيغة تاريخ
+    if (scheduledTimeStr.includes('GMT') || scheduledTimeStr.includes('1899')) {
+       const d = new Date(scheduledTimeStr);
+       if (!isNaN(d.getTime())) {
+          schedH = d.getHours();
+          schedM = d.getMinutes();
+       }
+    } else {
+       const parts = scheduledTimeStr.split(':').map(Number);
+       schedH = parts[0] || 0;
+       schedM = parts[1] || 0;
+    }
+
     const now = new Date();
     const schedDate = new Date(now);
     schedDate.setHours(schedH, schedM, 0, 0);
@@ -140,8 +175,8 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
              <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">{currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
              <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
              <div className="mt-4 flex justify-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الحضور: {user.checkInTime || '09:00'}</span>
-                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الانصراف: {user.checkOutTime || '17:00'}</span>
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الحضور: {formatTimeDisplay(user.checkInTime || '09:00')}</span>
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الانصراف: {formatTimeDisplay(user.checkOutTime || '17:00')}</span>
              </div>
           </div>
           <div className="space-y-6 max-w-md mx-auto">
