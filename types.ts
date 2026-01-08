@@ -21,6 +21,7 @@ export interface User {
   role: 'employee' | 'admin';
   deviceId?: string;
   jobTitle?: string;
+  defaultBranchId?: string; // الفرع الافتراضي الذي اختاره الموظف عند التسجيل
 }
 
 export interface ReportAccount {
