@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Branch, AttendanceRecord } from '../types';
-import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, RotateCcw, Cloud, WifiOff } from 'lucide-react';
+import { MapPin, Clock, CheckCircle, Navigation, AlertCircle, RotateCcw, Cloud, WifiOff, FileText } from 'lucide-react';
 import { calculateDistance } from '../utils';
 
 interface UserDashboardProps {
@@ -26,7 +26,6 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   lastUpdated 
 }) => {
   // تحديد الفرع الافتراضي للموظف عند تحميل الصفحة
-  // تم التعديل لدعم المطابقة بالاسم أو الـ ID
   const findInitialBranchId = () => {
     if (!user.defaultBranchId) return '';
     const branchById = branches.find(b => b.id === user.defaultBranchId);
@@ -42,6 +41,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
+  const [reason, setReason] = useState(''); // حالة الملاحظات الجديدة
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -118,11 +118,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
       type,
       timestamp: new Date().toISOString(),
       latitude: currentLocation.lat,
-      longitude: currentLocation.lng
+      longitude: currentLocation.lng,
+      reason: reason.trim() // إرسال السبب
     };
 
     setRecords(prev => [...prev, newRecord]);
     setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح.` });
+    setReason(''); // مسح مربع النص بعد النجاح
 
     if (googleSheetLink) {
       try {
@@ -194,6 +196,18 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter flex items-center gap-1">
+                <FileText size={12} /> ملاحظات (سبب التأخير / الانصراف المبكر)
+              </label>
+              <textarea 
+                value={reason} 
+                onChange={e => setReason(e.target.value)}
+                placeholder="اكتب السبب هنا في حال وجود تأخير أو انصراف مبكر..."
+                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-right h-24 resize-none shadow-inner text-xs placeholder:text-slate-600"
+              />
+            </div>
+
             <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex flex-col gap-3 shadow-inner">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -240,7 +254,10 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
                   <span className="text-slate-300">{r.branchName}</span>
                   <span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span>
                 </div>
-                <div className="text-[9px] text-slate-500 font-bold">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
+                <div className="text-[9px] text-slate-500 font-bold mb-1">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
+                {r.reason && (
+                  <div className="text-[8px] text-slate-400 font-bold bg-slate-800 p-2 rounded-lg border border-slate-700">السبب: {r.reason}</div>
+                )}
               </div>
             ))
           )}
