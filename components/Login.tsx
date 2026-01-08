@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, AppConfig, Job } from '../types';
-import { UserPlus, LogIn, ShieldAlert, Briefcase, Loader2, Link as LinkIcon, Smartphone, AlertCircle } from 'lucide-react';
+import { UserPlus, LogIn, ShieldAlert, Briefcase, Loader2, Link as LinkIcon, Smartphone, AlertCircle, WifiOff } from 'lucide-react';
 import { getDeviceFingerprint } from '../utils';
 
 interface LoginProps {
@@ -37,6 +37,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // منع التسجيل في حال عدم وجود إنترنت
+    if (!navigator.onLine) {
+      setError('عذراً، لا يمكن إتمام عملية التسجيل والجهاز غير متصل بالإنترنت. يرجى التأكد من الاتصال والمحاولة مرة أخرى.');
+      return;
+    }
+
     if (!fullName || !nationalId || !password || !selectedJob) {
       setError('يرجى إكمال جميع البيانات واختيار الوظيفة');
       return;
@@ -80,7 +87,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
     if (adminConfig.googleSheetLink) {
       try {
-        const response = await fetch(adminConfig.googleSheetLink, {
+        await fetch(adminConfig.googleSheetLink, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
@@ -101,6 +108,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
 
   const handleEmployeeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // منع تسجيل الدخول في حال عدم وجود إنترنت
+    if (!navigator.onLine) {
+      setError('عذراً، لا يمكن تسجيل الدخول والجهاز غير متصل بالإنترنت. يرجى التأكد من الاتصال لتحديث بيانات الحساب.');
+      return;
+    }
     
     if (allUsers.length === 0 && adminConfig.syncUrl) {
        setError('جاري جلب البيانات، يرجى الانتظار ثوانٍ...');
@@ -115,13 +128,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
       // 1. التحقق: هل هذا الهاتف (الذي يحاول الدخول الآن) يخص موظفاً آخر؟
       const otherDeviceOwner = allUsers.find(u => u.deviceId === currentDeviceId && u.nationalId !== nationalId);
       if (otherDeviceOwner) {
-        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر . لا يسمح بفتح حسابين من جهاز واحد.`);
+        setError(`عذراً، هذا الهاتف مسجل باسم موظف آخر (${otherDeviceOwner.fullName}). لا يسمح بفتح حسابين من جهاز واحد.`);
         return;
       }
 
       // 2. إذا كان حساب الموظف غير مربوط بجهاز حالياً (تم مسح الـ Device ID من قبل الأدمن)
       if (!user.deviceId || user.deviceId === "") {
-        // نربطه بالجهاز الحالي بشرط ألا يكون الجهاز "محجوزاً" لموظف آخر (تم التحقق في الخطوة السابقة)
         user.deviceId = currentDeviceId;
         
         if (adminConfig.googleSheetLink) {
@@ -162,6 +174,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
     }
   };
 
+  const handleUnlink = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في فك الارتباط بالشركة الحالية؟ ستحتاج لإدخال الرابط مرة أخرى للوصول للنظام.')) {
+      setAdminConfig({ syncUrl: '', googleSheetLink: '' });
+      setMode('connect');
+      setError('');
+    }
+  };
+
   const inputClasses = "w-full px-4 py-3.5 rounded-2xl border border-slate-600 bg-slate-900 text-white placeholder:text-slate-500 font-bold outline-none focus:border-blue-500 transition-all shadow-inner";
 
   return (
@@ -192,6 +212,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               <p className="text-orange-400 text-xs font-bold leading-relaxed text-right">
                 التطبيق غير مرتبط بشركة حالياً. يرجى إدخال "رابط المزامنة" من المسؤول للبدء.
               </p>
+            </div>
+          )}
+
+          {!navigator.onLine && (
+            <div className="mb-6 p-3 bg-red-900/30 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-400 text-[10px] font-black uppercase">
+              <WifiOff size={16} /> الهاتف غير متصل بالإنترنت
             </div>
           )}
 
@@ -268,6 +294,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, allUsers, adminConfig, available
               </button>
               <button type="button" onClick={() => setMode(adminConfig.syncUrl ? 'login' : 'connect')} className="w-full text-slate-500 text-[10px] font-black py-2">العودة</button>
             </form>
+          )}
+
+          {/* خيار فك الارتباط / تغيير الرابط */}
+          {adminConfig.syncUrl && mode !== 'admin' && (
+            <button 
+              type="button" 
+              onClick={handleUnlink}
+              className="mt-6 w-full text-slate-500 hover:text-red-400 text-[10px] font-black py-2 uppercase tracking-widest flex items-center justify-center gap-1.5 transition-colors border-t border-slate-700/50 pt-4"
+            >
+              <LinkIcon size={12} className="rotate-45" /> تغيير رابط الشركة / فك الارتباط
+            </button>
           )}
         </div>
       </div>
