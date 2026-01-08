@@ -25,15 +25,12 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   isSyncing, 
   lastUpdated 
 }) => {
-  // تحديد الفرع الافتراضي للموظف عند تحميل الصفحة
   const findInitialBranchId = () => {
     if (!user.defaultBranchId) return '';
     const branchById = branches.find(b => b.id === user.defaultBranchId);
     if (branchById) return branchById.id;
-    
     const branchByName = branches.find(b => b.name === user.defaultBranchId);
     if (branchByName) return branchByName.id;
-    
     return '';
   };
 
@@ -41,7 +38,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
   const [currentLocation, setCurrentLocation] = useState<{ lat: number, lng: number, timestamp: number } | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error' | 'none', msg: string }>({ type: 'none', msg: '' });
-  const [reasonText, setReasonText] = useState(''); // تم تغيير الاسم لتجنب التعارض
+  const [reasonText, setReasonText] = useState('');
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -59,84 +56,66 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     setIsVerifying(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setCurrentLocation({ 
-          lat: pos.coords.latitude, 
-          lng: pos.coords.longitude,
-          timestamp: Date.now() 
-        });
+        setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, timestamp: Date.now() });
         setIsVerifying(false);
-        if (status.msg.includes('الموقع الجغرافي قديم')) {
-          setStatus({ type: 'none', msg: '' });
-        }
+        if (status.msg.includes('الموقع الجغرافي قديم')) setStatus({ type: 'none', msg: '' });
       },
-      () => {
-        alert('يرجى تفعيل GPS ومنح صلاحية الوصول للموقع');
-        setIsVerifying(false);
-      },
+      () => { alert('يرجى تفعيل GPS ومنح صلاحية الوصول للموقع'); setIsVerifying(false); },
       { enableHighAccuracy: true }
     );
   };
 
+  const calculateTimeDiff = (type: 'check-in' | 'check-out'): string => {
+    const scheduledTimeStr = type === 'check-in' ? (user.checkInTime || "09:00") : (user.checkOutTime || "17:00");
+    const [schedH, schedM] = scheduledTimeStr.split(':').map(Number);
+    const now = new Date();
+    const schedDate = new Date(now);
+    schedDate.setHours(schedH, schedM, 0, 0);
+
+    const diffMs = now.getTime() - schedDate.getTime();
+    const diffMinsTotal = Math.floor(diffMs / 60000);
+    const absMins = Math.abs(diffMinsTotal);
+    const h = Math.floor(absMins / 60);
+    const m = absMins % 60;
+    
+    let timeStr = `${h > 0 ? h + ' ساعة و ' : ''}${m} دقيقة`;
+    
+    if (type === 'check-in') {
+      return diffMinsTotal > 0 ? `متأخر ${timeStr}` : `مبكر ${timeStr}`;
+    } else {
+      return diffMinsTotal < 0 ? `انصراف مبكر ${timeStr}` : `انصراف متأخر ${timeStr}`;
+    }
+  };
+
   const handleAttendance = async (type: 'check-in' | 'check-out') => {
-    if (!navigator.onLine) {
-      setStatus({ type: 'error', msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت.' });
-      return;
-    }
-
-    if (!selectedBranchId || !currentLocation) {
-      setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' });
-      return;
-    }
-
+    if (!navigator.onLine) { setStatus({ type: 'error', msg: 'لا يمكن إرسال البيانات بدون اتصال بالإنترنت.' }); return; }
+    if (!selectedBranchId || !currentLocation) { setStatus({ type: 'error', msg: 'اختر الفرع وفعل الموقع أولاً' }); return; }
     const locationAge = Date.now() - currentLocation.timestamp;
-    if (locationAge > 60000) {
-      setStatus({ type: 'error', msg: 'بيانات الموقع قديمة. يرجى تحديث الموقع.' });
-      return;
-    }
-
+    if (locationAge > 60000) { setStatus({ type: 'error', msg: 'بيانات الموقع قديمة. يرجى تحديث الموقع.' }); return; }
     const branch = branches.find(b => b.id === selectedBranchId);
     if (!branch) return;
-
     const distance = calculateDistance(currentLocation.lat, currentLocation.lng, branch.latitude, branch.longitude);
+    if (distance > branch.radius) { setStatus({ type: 'error', msg: `بعيد عن الفرع بمسافة ${Math.round(distance)}م. الحد المسموح ${branch.radius}م.` }); return; }
 
-    if (distance > branch.radius) {
-      setStatus({ 
-        type: 'error', 
-        msg: `بعيد عن الفرع بمسافة ${Math.round(distance)}م. الحد المسموح ${branch.radius}م.` 
-      });
-      return;
-    }
+    const timeDiffString = calculateTimeDiff(type);
 
-    // إنشاء السجل مع التأكد من مطابقة نوع AttendanceRecord
     const newRecord: AttendanceRecord = {
       id: Math.random().toString(36).substr(2, 9),
-      userId: user.id,
-      userName: user.fullName,
-      userJob: user.jobTitle,
-      branchId: branch.id,
-      branchName: branch.name,
-      type: type,
-      timestamp: new Date().toISOString(),
-      latitude: currentLocation.lat,
-      longitude: currentLocation.lng,
-      reason: reasonText.trim() // إرسال السبب
+      userId: user.id, userName: user.fullName, userJob: user.jobTitle,
+      branchId: branch.id, branchName: branch.name, type: type,
+      timestamp: new Date().toISOString(), latitude: currentLocation.lat, longitude: currentLocation.lng,
+      reason: reasonText.trim(), timeDiff: timeDiffString
     };
 
     setRecords(prev => [...prev, newRecord]);
-    setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح.` });
-    setReasonText(''); // مسح مربع النص بعد النجاح
+    setStatus({ type: 'success', msg: `تم تسجيل ${type === 'check-in' ? 'الحضور' : 'الانصراف'} بنجاح. (${timeDiffString})` });
+    setReasonText('');
 
     if (googleSheetLink) {
       try {
         await fetch(googleSheetLink, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            action: 'saveAttendance',
-            ...newRecord, 
-            nationalId: user.nationalId 
-          })
+          method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'saveAttendance', ...newRecord, nationalId: user.nationalId })
         });
       } catch (err) { console.error(err); }
     }
@@ -153,87 +132,43 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             <button onClick={onRefresh} disabled={isSyncing} className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95">
               <RotateCcw size={20} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
             </button>
-            {lastUpdated && (
-              <div className="flex items-center gap-1 text-[8px] font-black text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-800 uppercase">
-                <Cloud size={8} /> محدث: {new Date(lastUpdated).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-              </div>
-            )}
+            {lastUpdated && (<div className="flex items-center gap-1 text-[8px] font-black text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-800 uppercase"><Cloud size={8} /> محدث: {new Date(lastUpdated).toLocaleTimeString('ar-EG')}</div>)}
           </div>
-
           <div className="text-center mb-8 pt-4">
              <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">أهلاً، {user.fullName.split(' ')[0]}</h2>
-             <div className="bg-blue-900/30 px-5 py-1.5 rounded-xl text-blue-400 border border-blue-800/40 font-black text-[10px] inline-block uppercase tracking-widest">
-               {user.jobTitle || 'موظف'}
-             </div>
-             
-             <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">
-                {currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
-             </div>
-             <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">
-                {currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+             <div className="bg-blue-900/30 px-5 py-1.5 rounded-xl text-blue-400 border border-blue-800/40 font-black text-[10px] inline-block uppercase tracking-widest">{user.jobTitle || 'موظف'}</div>
+             <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">{currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
+             <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+             <div className="mt-4 flex justify-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الحضور: {user.checkInTime || '09:00'}</span>
+                <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">الانصراف: {user.checkOutTime || '17:00'}</span>
              </div>
           </div>
-
           <div className="space-y-6 max-w-md mx-auto">
-            {!navigator.onLine && (
-              <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-2xl flex items-center gap-3 text-red-400 text-[10px] font-black uppercase">
-                <WifiOff size={16} /> الهاتف غير متصل بالإنترنت حالياً
-              </div>
-            )}
-
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter">موقع التسجيل</label>
               <div className="relative">
                 <select value={selectedBranchId} onChange={e => setSelectedBranchId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 text-white px-6 py-4 rounded-2xl font-bold outline-none cursor-pointer appearance-none shadow-inner focus:border-blue-500 transition-all text-right">
                   <option value="">-- اختر الفرع للتسجيل --</option>
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} {(b.id === user.defaultBranchId || b.name === user.defaultBranchId) ? '(الأساسي)' : ''}
-                    </option>
-                  ))}
+                  {branches.map(b => (<option key={b.id} value={b.id}>{b.name} {(b.id === user.defaultBranchId || b.name === user.defaultBranchId) ? '(الأساسي)' : ''}</option>))}
                 </select>
                 <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               </div>
             </div>
-
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter flex items-center gap-1">
-                <FileText size={12} /> ملاحظات (سبب التأخير / الانصراف المبكر)
-              </label>
-              <textarea 
-                value={reasonText} 
-                onChange={e => setReasonText(e.target.value)}
-                placeholder="اكتب السبب هنا في حال وجود تأخير أو انصراف مبكر..."
-                className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-right h-24 resize-none shadow-inner text-xs placeholder:text-slate-600"
-              />
+              <label className="text-[10px] font-black text-slate-500 mr-2 uppercase tracking-tighter flex items-center gap-1"><FileText size={12} /> ملاحظات (سبب التأخير / الانصراف المبكر)</label>
+              <textarea value={reasonText} onChange={e => setReasonText(e.target.value)} placeholder="اكتب السبب هنا في حال وجود تأخير أو انصراف مبكر..." className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl font-bold outline-none focus:border-blue-500 transition-all text-right h-24 resize-none shadow-inner text-xs placeholder:text-slate-600" />
             </div>
-
             <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-700 flex flex-col gap-3 shadow-inner">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${currentLocation && locationAgeSeconds < 60 ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
-                    <Navigation size={18} className={isVerifying ? 'animate-spin' : ''} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${currentLocation && locationAgeSeconds < 60 ? 'text-green-400' : 'text-slate-500'}`}>
-                      {currentLocation ? (locationAgeSeconds < 60 ? 'الموقع الجغرافي مُحدّث' : 'الموقع بحاجة لتحديث') : 'يرجى تحديد الموقع'}
-                    </span>
-                    {currentLocation && (
-                      <span className="text-[8px] text-slate-500 font-bold uppercase mt-0.5">منذ {locationAgeSeconds} ثانية</span>
-                    )}
-                  </div>
+                  <div className={`p-2 rounded-lg ${currentLocation && locationAgeSeconds < 60 ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}><Navigation size={18} className={isVerifying ? 'animate-spin' : ''} /></div>
+                  <div className="flex flex-col"><span className={`text-[10px] font-black uppercase tracking-widest ${currentLocation && locationAgeSeconds < 60 ? 'text-green-400' : 'text-slate-500'}`}>{currentLocation ? (locationAgeSeconds < 60 ? 'الموقع الجغرافي مُحدّث' : 'الموقع بحاجة لتحديث') : 'يرجى تحديد الموقع'}</span>{currentLocation && (<span className="text-[8px] text-slate-500 font-bold uppercase mt-0.5">منذ {locationAgeSeconds} ثانية</span>)}</div>
                 </div>
                 <button onClick={getGeolocation} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-black text-[10px] uppercase transition-all active:scale-95 shadow-lg">تحديث</button>
               </div>
             </div>
-
-            {status.type !== 'none' && (
-              <div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>
-                {status.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle size={20} className="shrink-0" />}
-                <span className="leading-relaxed">{status.msg}</span>
-              </div>
-            )}
-
+            {status.type !== 'none' && (<div className={`p-4 rounded-2xl text-[10px] font-black border flex items-center gap-3 ${status.type === 'success' ? 'bg-green-900/20 text-green-400 border-green-800/50' : 'bg-red-900/20 text-red-400 border-red-800/50'}`}>{status.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle size={20} className="shrink-0" />}<span className="leading-relaxed">{status.msg}</span></div>)}
             <div className="grid grid-cols-2 gap-4">
               <button onClick={() => handleAttendance('check-in')} className="py-6 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-black text-lg shadow-xl shadow-blue-900/20 active:scale-95 transition-all">حضور</button>
               <button onClick={() => handleAttendance('check-out')} className="py-6 bg-slate-700 hover:bg-slate-600 text-white rounded-2xl font-black text-lg shadow-xl shadow-slate-900/20 active:scale-95 transition-all border border-slate-600">انصراف</button>
@@ -241,23 +176,16 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
           </div>
         </div>
       </div>
-      
       <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 shadow-xl text-white">
         <h3 className="font-black mb-6 border-b border-slate-700 pb-4 flex items-center gap-2 text-blue-400 text-[10px] uppercase tracking-widest">السجل الأخير</h3>
         <div className="space-y-4">
-          {myRecords.length === 0 ? (
-            <div className="text-center py-10 opacity-20"><Clock size={40} className="mx-auto" /></div>
-          ) : (
+          {myRecords.length === 0 ? (<div className="text-center py-10 opacity-20"><Clock size={40} className="mx-auto" /></div>) : (
             myRecords.map(r => (
               <div key={r.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-700/50 group hover:border-blue-500 transition-all text-right">
-                <div className="flex justify-between font-black text-[10px] mb-1 uppercase tracking-tighter">
-                  <span className="text-slate-300">{r.branchName}</span>
-                  <span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span>
-                </div>
+                <div className="flex justify-between font-black text-[10px] mb-1 uppercase tracking-tighter"><span className="text-slate-300">{r.branchName}</span><span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span></div>
                 <div className="text-[9px] text-slate-500 font-bold mb-1">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
-                {r.reason && (
-                  <div className="text-[8px] text-slate-400 font-bold bg-slate-800 p-2 rounded-lg border border-slate-700">السبب: {r.reason}</div>
-                )}
+                <div className="text-[8px] text-blue-400 font-black mb-1 italic uppercase">{r.timeDiff}</div>
+                {r.reason && (<div className="text-[8px] text-slate-400 font-bold bg-slate-800 p-2 rounded-lg border border-slate-700">السبب: {r.reason}</div>)}
               </div>
             ))
           )}
