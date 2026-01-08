@@ -205,6 +205,7 @@ export default function ReportsView({ syncUrl: initialSyncUrl, adminConfig }: Re
       'الوظيفة': r.job,
       'الفرع': r.branch,
       'الحالة': r.type === 'check-in' ? 'حضور' : 'انصراف',
+      'الملاحظات/السبب': r.reason || '', // إضافة السبب في ملف الإكسل
       'الموقع GPS': r.gps
     }));
     
