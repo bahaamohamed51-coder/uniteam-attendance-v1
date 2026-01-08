@@ -23,6 +23,8 @@ export interface User {
   jobTitle?: string;
   defaultBranchId?: string; // سيحتوي على اسم الفرع للعرض أو الـ ID للمطابقة
   registrationDate?: string; // تاريخ التسجيل لأول مرة
+  checkInTime?: string; // وقت الحضور الافتراضي (HH:mm)
+  checkOutTime?: string; // وقت الانصراف الافتراضي (HH:mm)
 }
 
 export interface ReportAccount {
@@ -44,6 +46,7 @@ export interface AttendanceRecord {
   latitude: number;
   longitude: number;
   reason?: string; // سبب التأخير أو الانصراف المبكر
+  timeDiff?: string; // الفرق بين الوقت الفعلي والافتراضي
 }
 
 export interface AppConfig {
