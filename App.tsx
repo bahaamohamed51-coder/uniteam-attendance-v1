@@ -138,6 +138,7 @@ const App: React.FC = () => {
           !currentUser ? (
             <Login 
               onLogin={handleLogin} allUsers={allUsers} adminConfig={config} availableJobs={jobs}
+              branches={branches} // تمرير الفروع للتسجيل
               setAdminConfig={(newCfg) => {
                 const cfg = { ...config, ...newCfg };
                 setConfig(cfg);
