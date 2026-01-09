@@ -18,7 +18,7 @@ export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2
 };
 
 export const formatDate = (dateStr: string) => {
-  return new Intl.DateTimeFormat('ar-EG', {
+  return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'full',
     timeStyle: 'short',
   }).format(new Date(dateStr));
