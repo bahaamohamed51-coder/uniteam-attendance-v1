@@ -164,7 +164,7 @@ const App: React.FC = () => {
         )}
       </main>
       <footer className="py-4 text-center text-gray-400 text-[10px] font-bold border-t uppercase tracking-widest">
-        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| Cloud Sync Active | Last Update: ${new Date(config.lastUpdated).toLocaleTimeString('ar-EG')}`}
+        Uniteam &copy; {new Date().getFullYear()} {config.lastUpdated && `| Cloud Sync Active | Last Update: ${new Date(config.lastUpdated).toLocaleTimeString('en-US')}`}
       </footer>
     </div>
   );
