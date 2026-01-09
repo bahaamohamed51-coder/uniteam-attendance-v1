@@ -65,20 +65,20 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
     );
   };
 
-  // وظيفة لتنسيق الوقت للعرض (ص/م)
+  // وظيفة لتنسيق الوقت للعرض (AM/PM)
   const formatTimeDisplay = (timeStr: string | undefined) => {
     if (!timeStr) return '--:--';
     if (timeStr.includes('GMT') || timeStr.includes('1899')) {
       try {
         const d = new Date(timeStr);
         if (!isNaN(d.getTime())) {
-          return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         }
       } catch(e) {}
     }
     if (/^\d{2}:\d{2}$/.test(timeStr)) {
       const [h, m] = timeStr.split(':').map(Number);
-      const suffix = h >= 12 ? 'م' : 'ص';
+      const suffix = h >= 12 ? 'PM' : 'AM';
       const displayH = h % 12 || 12;
       return `${displayH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${suffix}`;
     }
@@ -200,13 +200,13 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             <button onClick={onRefresh} disabled={isSyncing} className="p-2.5 bg-slate-900 rounded-xl border border-slate-700 text-slate-400 hover:text-blue-400 transition-all shadow-lg active:scale-95">
               <RotateCcw size={20} className={isSyncing ? 'animate-spin text-blue-400' : ''} />
             </button>
-            {lastUpdated && (<div className="flex items-center gap-1 text-[8px] font-black text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-800 uppercase"><Cloud size={8} /> محدث: {new Date(lastUpdated).toLocaleTimeString('ar-EG')}</div>)}
+            {lastUpdated && (<div className="flex items-center gap-1 text-[8px] font-black text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-800 uppercase"><Cloud size={8} /> Updated: {new Date(lastUpdated).toLocaleTimeString('en-US')}</div>)}
           </div>
           <div className="text-center mb-8 pt-4">
              <h2 className="text-3xl font-black text-white mb-2 tracking-tighter">أهلاً، {user.fullName.split(' ')[0]}</h2>
              <div className="bg-blue-900/30 px-5 py-1.5 rounded-xl text-blue-400 border border-blue-800/40 font-black text-[10px] inline-block uppercase tracking-widest">{user.jobTitle || 'موظف'}</div>
-             <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">{currentTime.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</div>
-             <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+             <div className="text-6xl font-black text-white mt-10 mb-2 tracking-tighter drop-shadow-2xl">{currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</div>
+             <div className="text-slate-500 font-bold text-xs uppercase tracking-widest">{currentTime.toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
              <div className="mt-4 flex justify-center gap-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">موعد الحضور: {formatTimeDisplay(user.checkInTime || '09:00')}</span>
                 <span className="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700">موعد الانصراف: {formatTimeDisplay(user.checkOutTime || '17:00')}</span>
@@ -256,7 +256,7 @@ const UserDashboard: React.FC<UserDashboardProps> = ({
             myRecords.map(r => (
               <div key={r.id} className="p-4 bg-slate-900 rounded-2xl border border-slate-700/50 group hover:border-blue-500 transition-all text-right">
                 <div className="flex justify-between font-black text-[10px] mb-1 uppercase tracking-tighter"><span className="text-slate-300">{r.branchName}</span><span className={r.type === 'check-in' ? 'text-green-400' : 'text-orange-400'}>{r.type === 'check-in' ? 'حضور' : 'انصراف'}</span></div>
-                <div className="text-[9px] text-slate-500 font-bold mb-1">{new Date(r.timestamp).toLocaleTimeString('ar-EG')}</div>
+                <div className="text-[9px] text-slate-500 font-bold mb-1">{new Date(r.timestamp).toLocaleTimeString('en-US')}</div>
                 <div className="text-[8px] text-blue-400 font-black mb-1 italic uppercase">{r.timeDiff}</div>
                 {r.reason && (<div className="text-[8px] text-slate-400 font-bold bg-slate-800 p-2 rounded-lg border border-slate-700">السبب: {r.reason}</div>)}
               </div>
