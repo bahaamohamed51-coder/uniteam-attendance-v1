@@ -47,7 +47,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const jobFileInputRef = useRef<HTMLInputElement>(null);
 
-  // وظيفة لتنسيق الوقت للعرض (ص/م)
+  // وظيفة لتنسيق الوقت للعرض (AM/PM)
   const formatTimeDisplay = (timeStr: string | undefined) => {
     if (!timeStr) return '--:--';
     // إذا كان التاريخ طويلاً (من جوجل شيت)
@@ -55,14 +55,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       try {
         const d = new Date(timeStr);
         if (!isNaN(d.getTime())) {
-          return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', hour12: true });
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
         }
       } catch(e) {}
     }
     // إذا كان التنسيق HH:mm
     if (/^\d{2}:\d{2}$/.test(timeStr)) {
       const [h, m] = timeStr.split(':').map(Number);
-      const suffix = h >= 12 ? 'م' : 'ص';
+      const suffix = h >= 12 ? 'PM' : 'AM';
       const displayH = h % 12 || 12;
       return `${displayH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${suffix}`;
     }
