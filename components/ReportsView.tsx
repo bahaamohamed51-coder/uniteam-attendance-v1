@@ -23,12 +23,12 @@ const CustomDatePicker = ({ label, value, onChange, placeholder }: { label: stri
     setIsOpen(false);
   };
   const changeMonth = (offset: number) => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1));
-  const monthNames = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   return (
     <div className="relative space-y-1 w-full text-right">
       <label className="text-[9px] font-black text-slate-500 mr-2 uppercase">{label}</label>
       <button onClick={() => setIsOpen(!isOpen)} className="w-full bg-slate-900 border border-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold text-right flex justify-between items-center hover:border-blue-500 transition-all"><span>{value || placeholder}</span><CalendarIcon size={14} className="text-slate-500" /></button>
-      {isOpen && (<div className="absolute z-50 mt-2 p-4 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-64 right-0"><div className="flex justify-between items-center mb-4"><button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronRight size={18} /></button><span className="text-xs font-black text-blue-400">{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span><button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronLeft size={18} /></button></div><div className="grid grid-cols-7 gap-1 text-center mb-2">{["ح", "ن", "ث", "ر", "خ", "ج", "س"].map(d => (<span key={d} className="text-[10px] text-slate-500 font-bold">{d}</span>))}</div><div className="grid grid-cols-7 gap-1 text-center">{Array.from({ length: firstDayOfMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => (<div key={`empty-${i}`} />))}{Array.from({ length: daysInMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => { const day = i + 1; const isSelected = value === new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0]; return (<button key={day} onClick={() => handleDateClick(day)} className={`py-1.5 text-[10px] font-bold rounded-lg transition-all ${isSelected ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-700'}`}>{day}</button>); })}</div><button onClick={() => setIsOpen(false)} className="w-full mt-4 py-1 text-[9px] text-slate-500 hover:text-white font-black uppercase tracking-widest border-t border-slate-700 pt-2">إغلاق</button></div>)}
+      {isOpen && (<div className="absolute z-50 mt-2 p-4 bg-slate-800 border border-slate-600 rounded-2xl shadow-2xl w-64 right-0"><div className="flex justify-between items-center mb-4"><button onClick={() => changeMonth(-1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronRight size={18} /></button><span className="text-xs font-black text-blue-400">{monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}</span><button onClick={() => changeMonth(1)} className="p-1 hover:bg-slate-700 rounded-lg text-white"><ChevronLeft size={18} /></button></div><div className="grid grid-cols-7 gap-1 text-center mb-2">{["S", "M", "T", "W", "T", "F", "S"].map(d => (<span key={d} className="text-[10px] text-slate-500 font-bold">{d}</span>))}</div><div className="grid grid-cols-7 gap-1 text-center">{Array.from({ length: firstDayOfMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => (<div key={`empty-${i}`} />))}{Array.from({ length: daysInMonth(viewDate.getFullYear(), viewDate.getMonth()) }).map((_, i) => { const day = i + 1; const isSelected = value === new Date(viewDate.getFullYear(), viewDate.getMonth(), day).toISOString().split('T')[0]; return (<button key={day} onClick={() => handleDateClick(day)} className={`py-1.5 text-[10px] font-bold rounded-lg transition-all ${isSelected ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-700'}`}>{day}</button>); })}</div><button onClick={() => setIsOpen(false)} className="w-full mt-4 py-1 text-[9px] text-slate-500 hover:text-white font-black uppercase tracking-widest border-t border-slate-700 pt-2">إغلاق</button></div>)}
     </div>
   );
 };
@@ -64,16 +64,16 @@ export default function ReportsView({ syncUrl: initialSyncUrl, adminConfig }: Re
 
   const exportToExcel = () => {
     const dataToExport = filteredRecords.map(r => ({
-      'التاريخ': new Date(r.date).toLocaleDateString('ar-EG'),
-      'الوقت': new Date(r.time).toLocaleTimeString('ar-EG'),
-      'اسم الموظف': r.name,
-      'الرقم القومي': r.nationalId,
-      'الوظيفة': r.job,
-      'الفرع': r.branch,
-      'الحالة': r.type === 'check-in' ? 'حضور' : 'انصراف',
-      'الفرق الزمني': r.timeDiff || '', // إدراج الفرق الزمني في ملف الإكسل
-      'الملاحظات/السبب': r.reason || '',
-      'الموقع GPS': r.gps
+      'Date': new Date(r.date).toLocaleDateString('en-US'),
+      'Time': new Date(r.time).toLocaleTimeString('en-US'),
+      'Employee Name': r.name,
+      'National ID': r.nationalId,
+      'Job': r.job,
+      'Branch': r.branch,
+      'Type': r.type === 'check-in' ? 'Check-In' : 'Check-Out',
+      'Time Diff': r.timeDiff || '', 
+      'Reason/Notes': r.reason || '',
+      'GPS Location': r.gps
     }));
     const ws = XLSX.utils.json_to_sheet(dataToExport);
     const wb = XLSX.utils.book_new();
@@ -81,7 +81,6 @@ export default function ReportsView({ syncUrl: initialSyncUrl, adminConfig }: Re
     XLSX.writeFile(wb, `Report_${username}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  // الحفاظ على بقية منطق الفلاتر والتصاميم
   const availableJobs = useMemo(() => Array.from(new Set(records.map(r => r.job))).filter(Boolean) as string[], [records]);
   const filteredRecords = useMemo(() => records.filter(r => { const rd = new Date(r.date); rd.setHours(0,0,0,0); let m = true; if (fromDate) { const f = new Date(fromDate); f.setHours(0,0,0,0); m = m && rd >= f; } if (toDate) { const t = new Date(toDate); t.setHours(0,0,0,0); m = m && rd <= t; } if (selectedJobs.length > 0) m = m && selectedJobs.includes(r.job); return m; }), [records, fromDate, toDate, selectedJobs]);
   const toggleJobSelection = (j: string) => setSelectedJobs(prev => prev.includes(j) ? prev.filter(x => x !== j) : [...prev, j]);
@@ -106,7 +105,7 @@ export default function ReportsView({ syncUrl: initialSyncUrl, adminConfig }: Re
           <div className="lg:col-start-4"><button onClick={() => { setFromDate(''); setToDate(''); setSelectedJobs([]); }} className="w-full px-6 py-3.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl text-[10px] font-black uppercase transition-all flex justify-center items-center gap-2 shadow-lg"><X size={14} /> مسح جميع الفلاتر</button></div>
         </div>
       </div>
-      <div className="p-10 text-center bg-slate-900/30 rounded-3xl border border-dashed border-slate-700"><p className="text-slate-500 text-xs font-black uppercase tracking-widest">تم إخفاء عرض الجدول المباشر. يمكنك استخدام الفلاتر أعلاه ثم الضغط على "تحميل Excel" لاستخراج التقارير.</p><div className="mt-4 flex flex-col items-center gap-2"><div className="text-[10px] text-blue-500 font-bold uppercase flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>عدد السجلات المفلترة حالياً: {filteredRecords.length}</div></div></div>
+      <div className="p-10 text-center bg-slate-900/30 rounded-3xl border border-dashed border-slate-700"><p className="text-slate-500 text-xs font-black uppercase tracking-widest">تم إخفاء عرض الجدول المباشر. يمكنك استخدام الفلاتر أعلاه ثم الضغط على "تحميل Excel" لاستخراج التقارير.</p><div className="mt-4 flex flex-col items-center gap-2"><div className="text-[10px] text-blue-500 font-bold uppercase flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>سجل مفلتر: {filteredRecords.length}</div></div></div>
     </div>
   );
 }
